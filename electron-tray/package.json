@@ -1,0 +1,17 @@
+{
+  "name": "weeklypet-tray",
+  "version": "1.0.0",
+  "private": true,
+  "description": "全球一周速览 · Electron 托盘版桌宠：常驻托盘，每周日 20:00 准点投递",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "selftest": "electron . --selftest",
+    "preview": "electron . --preview"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.7.0"
+  }
+}

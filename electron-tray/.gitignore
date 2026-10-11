@@ -1,0 +1,11 @@
+# 依赖与构建产物（很大，不入库）
+node_modules/
+dist/
+out/
+
+# 调试产物
+debug.log
+selftest.txt
+_shot-*.png
+_shot-*.json
+_probe.*

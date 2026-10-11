@@ -1,0 +1,814 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全球一周速览 · 桌宠</title>
+<style>
+:root{
+  --bg:#0a0c11; --surf:#141926; --surf2:#1a2130; --surf3:#222b3d;
+  --line:#242c3d; --line2:#33405a;
+  --fg:#e8edf7; --fg2:#a4b0c6; --fg3:#6b7891;
+  --brand:#5eead4; --brand2:#22d3ee;
+  --hot:#fb7185; --warn:#fbbf24;
+  --r:16px; --r2:11px;
+  --sh:0 10px 30px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.4);
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:transparent; color:var(--fg);
+  font-family:var(--sans); font-size:14px; line-height:1.7;
+  overflow:hidden; user-select:none; -webkit-font-smoothing:antialiased;
+}
+/* 演示背景（可在设置里关掉，关掉后就是纯透明桌宠，可叠在桌面上） */
+body.stage::before{
+  content:""; position:fixed; inset:0; z-index:-1;
+  background:
+    radial-gradient(900px 600px at 15% 10%, rgba(96,165,250,.10), transparent 60%),
+    radial-gradient(800px 500px at 85% 90%, rgba(192,132,252,.10), transparent 62%),
+    linear-gradient(160deg,#0a0c11,#0f131b 60%,#0a0c11);
+}
+
+/* ═══ 桌宠主体 ═══ */
+/* 宽度与主图同宽（96px），这样居中阴影才真的居中 */
+#pet{position:fixed; left:0; top:0; width:96px; height:118px; z-index:40;
+  cursor:grab; touch-action:none}
+#pet.dragging{cursor:grabbing}
+#pet .bob{position:relative; width:96px; height:96px;
+  animation:bob 3.4s ease-in-out infinite; transform-origin:50% 100%}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){#pet .bob{animation:none}}
+/* 主图与兜底图必须【重叠】而不是依次排列：两者都绝对定位，
+   主图在上（z-index:1）。原图加载失败时 <img> 会被移除，兜底图自然露出。 */
+/* 主图：DSH 官方图标原图（非像素化）。object-fit:cover 顺手裁掉原图自带的
+   圆角浅色底板边缘，避免深色主题下出现一圈白边。 */
+#pet img{position:absolute; left:0; top:0; z-index:1;
+  display:block; width:96px; height:96px; object-fit:cover;
+  transform:scale(1.07); border:0;
+  filter:drop-shadow(0 8px 16px rgba(0,0,0,.55)); pointer-events:none}
+/* 兜底：原图加载失败时用手绘字符图渲染的 SVG。
+   注意这里必须是 96×78（= 32:26 的字符图比例），不能跟主图一样用正方形，
+   否则兜底鲸鱼会被额外留出上下空白。 */
+#pet svg{position:absolute; left:0; top:0; z-index:0;
+  display:block; width:96px; height:78px; shape-rendering:crispEdges;
+  filter:drop-shadow(0 8px 16px rgba(0,0,0,.55)); pointer-events:none}
+#pet .shadow{position:absolute; left:20px; right:20px; top:94px; height:10px;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%); pointer-events:none}
+
+/* ═══ 工具栏 ═══ */
+#bar{position:fixed; z-index:41; display:flex; gap:6px; align-items:center}
+.tool{position:relative; width:34px; height:34px; border-radius:11px; cursor:pointer;
+  display:grid; place-items:center; font-size:16px; line-height:1;
+  background:var(--surf); border:1px solid var(--line); color:var(--fg2);
+  transition:.16s; box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.tool:hover{color:var(--fg); border-color:var(--line2); transform:translateY(-1px)}
+.tool .dot{position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; padding:0 4px;
+  border-radius:9px; background:var(--hot); color:#fff; font:700 10px/16px var(--mono);
+  text-align:center; box-shadow:0 0 0 2px var(--bg); display:none}
+.tool.unread .dot{display:block; animation:pulse 1.7s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
+.tool.bell{animation:bell 2.6s ease-in-out infinite}
+@keyframes bell{0%,88%,100%{transform:rotate(0)}90%{transform:rotate(-13deg)}94%{transform:rotate(13deg)}}
+
+/* ═══ 聊天气泡 ═══ */
+#bubble{position:fixed; z-index:45; width:356px; max-width:calc(100vw - 28px);
+  background:var(--surf); border:1px solid var(--line2); border-radius:var(--r);
+  box-shadow:var(--sh); overflow:hidden;
+  opacity:0; transform:translateY(10px) scale(.97); transform-origin:bottom left;
+  transition:opacity .22s ease, transform .22s cubic-bezier(.2,.9,.3,1.2);
+  pointer-events:none}
+#bubble.show{opacity:1; transform:none; pointer-events:auto}
+.bh{display:flex; align-items:center; gap:9px; padding:11px 14px;
+  background:linear-gradient(180deg,var(--surf2),var(--surf)); border-bottom:1px solid var(--line)}
+.bh .who{font-weight:700; font-size:13px}
+.bh .tag{font:600 10px/1 var(--mono); letter-spacing:.06em; padding:3px 7px; border-radius:6px;
+  background:rgba(94,234,212,.13); color:var(--brand); border:1px solid rgba(94,234,212,.28)}
+.bh .x{margin-left:auto; cursor:pointer; color:var(--fg3); font-size:16px; padding:0 2px; line-height:1}
+.bh .x:hover{color:var(--fg)}
+.bb{padding:14px}
+.bb .msg{margin:0 0 12px; font-size:13.5px; color:var(--fg2); line-height:1.75}
+.bb .msg b{color:var(--fg)}
+.bb .msg .hl{color:var(--brand); font-weight:700}
+
+/* 文件卡 */
+.file{display:flex; gap:11px; align-items:center; padding:12px;
+  background:var(--surf2); border:1px solid var(--line); border-radius:var(--r2);
+  cursor:pointer; transition:.16s; text-decoration:none; color:inherit}
+.file:hover{border-color:var(--brand); background:var(--surf3); transform:translateY(-1px)}
+.file .ic{flex:none; width:40px; height:40px; border-radius:9px; display:grid; place-items:center;
+  background:linear-gradient(140deg,rgba(94,234,212,.18),rgba(34,211,238,.12));
+  border:1px solid rgba(94,234,212,.3); font-size:19px}
+.file .n{flex:1; min-width:0}
+.file .n .t{display:block; font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.file .n .s{display:block; font:500 11px/1.5 var(--mono); color:var(--fg3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.file .go{flex:none; font-size:11px; color:var(--brand); font-weight:700; white-space:nowrap}
+
+/* 勘误 / 补充区块 */
+.erratum{margin-top:12px; border-radius:var(--r2); overflow:hidden;
+  border:1px solid rgba(251,191,36,.32); background:rgba(251,191,36,.07)}
+.erratum .eh{display:flex; align-items:center; gap:7px; padding:8px 11px;
+  background:rgba(251,191,36,.10); font:700 11px/1 var(--mono); letter-spacing:.05em; color:var(--warn)}
+.erratum .eb{padding:10px 11px; font-size:12.5px; color:var(--fg2); line-height:1.7}
+.erratum .eb ul{margin:0; padding-left:16px}
+.erratum .eb li{margin-bottom:6px}
+.erratum .eb li:last-child{margin-bottom:0}
+.erratum .eb b{color:var(--fg)}
+.erratum .lead{color:var(--fg3); margin-bottom:7px; font-size:12px}
+
+/* 倒计时条 */
+.cd{height:3px; background:var(--line); overflow:hidden}
+.cd i{display:block; height:100%; width:100%;
+  background:linear-gradient(90deg,var(--brand),var(--brand2)); transform-origin:left}
+.cd.run i{animation:shrink var(--cddur,9000ms) linear forwards}
+@keyframes shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.bb .fine{margin:10px 0 0; font-size:11.5px; color:var(--fg3); text-align:center}
+
+/* ═══ 面板 ═══ */
+#panel{position:fixed; z-index:46; width:356px; max-width:calc(100vw - 28px);
+  max-height:min(68vh,540px); background:var(--surf); border:1px solid var(--line2);
+  border-radius:var(--r); box-shadow:var(--sh); overflow:hidden; display:none; flex-direction:column}
+#panel.show{display:flex}
+.ph{display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--surf2),var(--surf))}
+.ph .t{font-weight:700; font-size:13px}
+.ph .x{margin-left:auto; cursor:pointer; color:var(--fg3)}
+.ph .x:hover{color:var(--fg)}
+.pb{padding:12px 14px; overflow-y:auto}
+.pb::-webkit-scrollbar{width:8px}
+.pb::-webkit-scrollbar-thumb{background:var(--line2); border-radius:4px}
+.row{display:flex; align-items:center; gap:10px; padding:10px 11px; border-radius:var(--r2);
+  border:1px solid var(--line); background:var(--surf2); margin-bottom:8px; cursor:pointer; transition:.16s}
+.row:hover{border-color:var(--brand); background:var(--surf3)}
+.row .d{flex:none; font:600 11px/1.5 var(--mono); color:var(--fg3); width:96px}
+.row .m{flex:1; min-width:0}
+.row .m .a{display:block; font-weight:650; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .m .b{display:block; font-size:11px; color:var(--fg3)}
+.row .s{flex:none; font:700 10px/1 var(--mono); padding:3px 6px; border-radius:5px}
+.row .s.ready{background:rgba(94,234,212,.15); color:var(--brand)}
+.row .s.planned{background:rgba(107,120,145,.2); color:var(--fg3)}
+.kv{display:flex; justify-content:space-between; gap:10px; padding:8px 0;
+  border-bottom:1px dashed var(--line); font-size:12.5px}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--fg3)}
+.kv .v{color:var(--fg); font-weight:650; font-family:var(--mono); font-size:12px; text-align:right}
+.pb h4{margin:14px 0 8px; font:700 11px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--fg3)}
+.pb h4:first-child{margin-top:0}
+.note{font-size:12px; color:var(--fg3); line-height:1.7; margin:8px 0 0}
+.btnrow{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+.btn{font:inherit; font-size:12.5px; cursor:pointer; padding:7px 13px; border-radius:9px;
+  background:var(--surf2); border:1px solid var(--line2); color:var(--fg2); transition:.16s}
+.btn:hover{color:var(--fg); border-color:var(--brand)}
+.btn.primary{background:linear-gradient(135deg,rgba(94,234,212,.2),rgba(34,211,238,.14));
+  border-color:rgba(94,234,212,.45); color:var(--brand); font-weight:650}
+label.sw{display:flex; align-items:center; gap:9px; padding:9px 0; font-size:12.5px; color:var(--fg2); cursor:pointer}
+label.sw input{accent-color:var(--brand); width:15px; height:15px}
+
+/* ═══ 轻提示 ═══ */
+#toast{position:fixed; z-index:60; left:50%; bottom:26px; transform:translate(-50%,14px);
+  background:var(--surf3); border:1px solid var(--line2); color:var(--fg);
+  padding:10px 16px; border-radius:999px; font-size:12.5px; box-shadow:var(--sh);
+  opacity:0; transition:.22s; pointer-events:none; max-width:80vw; text-align:center}
+#toast.show{opacity:1; transform:translate(-50%,0)}
+
+@media (max-width:520px){
+  #bubble,#panel{width:calc(100vw - 20px)}
+  #pet{width:82px;height:100px}
+  #pet img{width:82px;height:82px}
+  #pet svg{width:82px;height:67px}
+  #pet .shadow{left:17px;right:17px;top:80px;height:9px}
+}
+</style>
+</head>
+<body class="stage">
+
+<!-- ══════ 桌宠：DSH 官方图标原图 + 手绘字符图兜底 ══════ -->
+<div id="pet" title="拖动我 · 单击打开收件箱">
+  <div class="shadow"></div>
+  <div class="bob">
+    <img id="whaleImg" alt="DeepSeek Harness 黑鲸" draggable="false">
+    <svg id="whale" viewBox="0 0 32 26" shape-rendering="crispEdges" aria-hidden="true"></svg>
+  </div>
+</div>
+
+<!-- ══════ 工具栏 ══════ -->
+<div id="bar">
+  <div class="tool" id="btnMail" title="收件箱">📬<span class="dot" id="mailDot">0</span></div>
+  <div class="tool" id="btnHist" title="期数清单">🗂</div>
+  <div class="tool" id="btnCfg" title="设置">⚙</div>
+</div>
+
+<!-- ══════ 气泡 ══════ -->
+<div id="bubble" role="dialog" aria-live="polite">
+  <div class="bh">
+    <span style="font-size:15px">🐋</span>
+    <span class="who">全球一周速览</span>
+    <span class="tag" id="bTag">第 1 期</span>
+    <span class="x" id="bClose" title="收起">✕</span>
+  </div>
+  <div class="cd" id="cdWrap"><i id="cdBar"></i></div>
+  <div class="bb">
+    <p class="msg" id="bMsg"></p>
+    <a class="file" id="bFile" href="#">
+      <span class="ic">📄</span>
+      <span class="n"><span class="t" id="bFileT">速览.html</span><span class="s" id="bFileS">点击用浏览器打开</span></span>
+      <span class="go">打开 ↗</span>
+    </a>
+    <div id="bErr"></div>
+    <p class="fine" id="bFine"></p>
+  </div>
+</div>
+
+<!-- ══════ 面板 ══════ -->
+<div id="panel">
+  <div class="ph"><span id="pIcon">🗂</span><span class="t" id="pTitle">期数清单</span><span class="x" id="pClose">✕</span></div>
+  <div class="pb" id="pBody"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   全球一周速览 · 桌宠         单文件版 · 无任何外部依赖
+   双击本文件即可运行（file:// 下同样可用）
+
+   ── 功能 ─────────────────────────────────────────────────────────────────
+   1) 每周日 20:00（本地时间，可改）到点 → 弹出聊天气泡投递当期速览文件
+   2) 点文件卡 → 浏览器打开归档的 .html
+   3) 超时没点 → 气泡自动收起，📬 邮箱图标出现红点（未读可累积）
+   4) 每一期自带 erratum 字段：对上一期的【勘误】与【遗漏补充】，
+      会作为独立区块显示在气泡里。生成新一期时填这里即可。
+
+   ── 每周怎么更新 ──────────────────────────────────────────────────────────
+   1) 把新的速览 .html 放进 issues/ 目录
+   2) 在下面 ISSUES 数组【开头】插入一条新记录（id / range / file / msg / erratum）
+      erratum.corrections  = 上一期说错的地方（复核后发现的）
+      erratum.supplements  = 上一期漏掉的内容
+   3) 刷新页面即可，不需要改别的地方
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  /* ───────── 可调配置 ───────── */
+  var DEFAULT_CFG = {
+    weekday: 0,            // 0=周日 1=周一 … 6=周六
+    hour: 20,              // 20:00
+    minute: 0,
+    autoCollapseMs: 9000,  // 气泡停留多久后自动收起
+    stage: true,           // 显示演示背景；关掉=纯透明桌宠
+    sound: false,          // 投递时是否响一声
+    avatar: 'official'     // 'official' = 官方原图；'ink' = 抠掉底板、背景透明
+  };
+  var WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  var CFG_KEY = 'weeklypet.cfg.v1', STATE_KEY = 'weeklypet.state.v1';
+
+  /* ───────── 期数清单（新的一期插到最前面） ───────── */
+  var ISSUES = [
+    {
+      id: '2026-10-04_10',
+      range: '2026.10.04 – 10.10',
+      file: 'issues/全球一周速览-2026-10-04_10.html',
+      size: '97 KB',
+      kicker: '第 1 期 · 首期 · 报纸头版',
+      msg: '这周的头条是模型发布和诺奖，但真正的变化发生在三个更安静的地方：' +
+           '<span class="hl">债券市场</span>、<span class="hl">全球贸易结构</span>，' +
+           '以及<span class="hl">「法条」与「街头」之间</span>。七分区 + 九条深度信号。',
+      errataIntro: '首期没有上一期可复核，这里放的是首期自查结果。',
+      erratum: {
+        corrections: [
+          { wrong: '克拉马托尔斯克 10/8 曾写作「33 死 18 伤」',
+            right: '顿涅茨克州警方通报为 30 死 20 伤，已按警方口径更正' }
+        ],
+        supplements: [
+          '黑海保加利亚专属经济区内两艘商船 10/6 遭无人机袭击：16 名船员获救，10/9 未找到残骸、无法确认归属',
+          '欧盟 10/7 批准的 743 名个人 + 826 个实体制裁方案，10/12 卢森堡外长会才正式通过',
+          '西班牙工会宣布 11/11 全国总罢工，与住房抗议属同一条因果链'
+        ]
+      }
+    }
+  ];
+
+  /* ───────── 小工具 ───────── */
+  var $ = function (s) { return document.querySelector(s); };
+  var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  function readStore(k, d) {
+    try {
+      var raw = localStorage.getItem(k); if (!raw) return d;
+      var o = JSON.parse(raw);
+      if (d && typeof d === 'object' && !Array.isArray(d)) { for (var p in d) { if (!(p in o)) o[p] = d[p]; } }
+      return o;
+    } catch (e) { return d; }
+  }
+  function writeStore(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function toast(t, ms) {
+    var el = $('#toast'); el.textContent = t; el.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { el.classList.remove('show'); }, ms || 2600);
+  }
+  function fmtDT(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+           ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function until(ms) {
+    if (ms <= 0) return '即将投递';
+    var s = Math.floor(ms / 1000), d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600); s -= h * 3600;
+    var m = Math.floor(s / 60); s -= m * 60;
+    if (d > 0) return d + ' 天 ' + h + ' 小时后';
+    if (h > 0) return h + ' 小时 ' + m + ' 分钟后';
+    if (m > 0) return m + ' 分 ' + s + ' 秒后';
+    return s + ' 秒后';
+  }
+
+  /* ───────── 时间推算 ─────────
+     一期的投递时刻 = 该期 range 结束日所在那一周的「配置星期几 + 配置时刻」 */
+  function endDate(range) {
+    var m = String(range).match(/(\d{4})\.(\d{2})\.(\d{2})\s*[–\-—~至]\s*(?:(\d{4})\.)?(\d{2})\.(\d{2})/);
+    if (!m) return null;
+    var y = m[4] ? +m[4] : +m[1];   // 跨年区间（如 2026.12.28 – 2027.01.03）要用后一个年份
+    return new Date(y, +m[5] - 1, +m[6], 0, 0, 0, 0);
+  }
+  function plannedAt(it, cfg) {
+    var end = endDate(it.range);
+    if (end) {
+      var add = (cfg.weekday - end.getDay() + 7) % 7;
+      return new Date(end.getFullYear(), end.getMonth(), end.getDate() + add, cfg.hour, cfg.minute, 0, 0);
+    }
+    if (it.deliveredAt) { var f = new Date(it.deliveredAt); if (!isNaN(f.getTime())) return f; }
+    return null;
+  }
+  function nextDelivery(cfg, now) {
+    now = now || new Date();
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), cfg.hour, cfg.minute, 0, 0);
+    d.setDate(d.getDate() + ((cfg.weekday - d.getDay() + 7) % 7));
+    if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 7);
+    return d;
+  }
+  function dueIssue(cfg, st, now) {
+    var t = now.getTime(), best = null, bestT = -1;
+    ISSUES.forEach(function (it) {
+      var p = plannedAt(it, cfg); if (!p) return;
+      var pt = p.getTime();
+      if (pt <= t && pt > bestT && st.delivered.indexOf(it.id) < 0) { best = it; bestT = pt; }
+    });
+    return best;
+  }
+
+  /* ───────── 状态 ───────── */
+  var cfg = readStore(CFG_KEY, DEFAULT_CFG);
+  var st = readStore(STATE_KEY, { delivered: [], seen: [], unreadIds: [], pos: null });
+  /* 旧版/手改过的 state 可能字段缺失或类型不对，这里做一次规整，
+     否则 tick() 里的 push 会抛异常并直接在 boot() 中断掉整个初始化。 */
+  if (!Array.isArray(st.delivered)) st.delivered = [];
+  if (!Array.isArray(st.seen)) st.seen = [];
+  if (!Array.isArray(st.unreadIds)) {
+    /* 从旧的数字型 unread 迁移 */
+    st.unreadIds = [];
+    if (typeof st.unread === 'number' && st.unread > 0) {
+      for (var _ui = 0; _ui < st.unread; _ui++) st.unreadIds.push('legacy-' + _ui);
+    }
+  }
+  delete st.unread;
+  var saveCfg = function () { writeStore(CFG_KEY, cfg); };
+  var saveSt = function () { writeStore(STATE_KEY, st); };
+  function markDelivered(id) { if (st.delivered.indexOf(id) < 0) st.delivered.push(id); saveSt(); }
+  function markSeen(id) {
+    if (st.seen.indexOf(id) < 0) st.seen.push(id);
+    st.unreadIds = []; saveSt(); paintMail();
+  }
+  function paintMail() {
+    var b = $('#btnMail'), d = $('#mailDot');
+    var n = st.unreadIds.length;
+    if (n > 0) {
+      b.classList.add('unread', 'bell');
+      d.textContent = n > 9 ? '9+' : n;
+    } else { b.classList.remove('unread', 'bell'); }
+  }
+
+  /* ───────── 头像：优先用 DSH 官方图标原图，失败则退回手绘字符图 ─────────
+     原图是 1024×1024 的 PNG，位于 DSH 安装目录的 resources 下。
+
+     ⚠️ 路径顺序很重要：浏览器能否加载本地文件取决于页面来源：
+        - 双击 index.html 打开 → file://  → 绝对路径能用
+        - 在 DSH 网页界面里预览 → http://127.0.0.1:19387
+          → 浏览器禁止 http 页面加载 file:/// 资源
+     相对路径在两种情况下都有效，所以推荐把图片放在本目录。 */
+  var AVATARS = {
+    official: [                                                  // 官方原图（带浅色圆角底板）
+      'whale-official.png',
+      'file:///D:/DeepSeek/DeepSeek%20Harness/resources/icon.png'
+    ],
+    ink: [                                                       // 抠掉底板、背景透明
+      'whale-ink.png',
+      'whale-official.png',
+      'file:///D:/DeepSeek/DeepSeek%20Harness/resources/icon.png'
+    ]
+  };
+  function applyWhale() {
+    var img = $('#whaleImg');
+    if (!img) { drawWhale(); return; }
+    var list = (AVATARS[cfg.avatar] || AVATARS.official).slice();
+    img.style.display = '';
+    var i = 0;
+    /* 用 onerror（而非 addEventListener）避免切换头像时把处理器层层叠加 */
+    img.onerror = function () {
+      i++;
+      if (i < list.length) { img.setAttribute('src', list[i]); }
+      else { img.style.display = 'none'; }   // 全部失败 → 露出下面的 SVG 字符图
+    };
+    img.setAttribute('src', list[0]);
+  }
+
+  /* ───────── 像素鲸鱼（兜底） ─────────
+     形状直接写成下面这张字符图（照着 DSH 官方那只蜷曲虎鲸画的）。
+     只有官方原图加载失败时才会用到它，但形状在源码里肉眼可读、可手改。
+
+        '#' = 深色鲸身      'o' = 白色斑块（腹部 / 眼斑）
+        'x' = 瞳孔（深色，画在白斑之上）   '.' = 透明背景
+
+     两条硬性规则：
+       1) 每行必须正好 32 个字符，少一个字符，后面的像素整体左移，图就歪了
+       2) 'o' 的左右都必须是 '#'，否则那段白色会渲染成漂在鲸鱼外面的白块 */
+  var WHALE_ART = [
+    /*  0 */ ".............###...###..........",
+    /*  1 */ "............#####.#####.........",
+    /*  2 */ ".............####.####..........",
+    /*  3 */ "............###oxo####..........",
+    /*  4 */ "..........#####oo#####..........",
+    /*  5 */ ".......####################.....",
+    /*  6 */ ".....########################...",
+    /*  7 */ "...####oooooo###################",
+    /*  8 */ "..###ooooooooo#################.",
+    /*  9 */ "..#oooooooooooooo##########.....",
+    /* 10 */ "..#ooooooooooooooo#########.....",
+    /* 11 */ "..#oooooooooooooooo########.....",
+    /* 12 */ "..#ooooooooooooooooo#######.....",
+    /* 13 */ "..##ooooooooooooooooo######.....",
+    /* 14 */ "...##oooooooooooooooo#####......",
+    /* 15 */ "....##oooooooooooooo####........",
+    /* 16 */ ".....###oooooooooo###...........",
+    /* 17 */ "......###oooooooo###............",
+    /* 18 */ ".......##oooooooo##.............",
+    /* 19 */ "........##########..............",
+    /* 20 */ ".........########...............",
+    /* 21 */ "..........######................",
+    /* 22 */ "...........####.................",
+    /* 23 */ "............##..................",
+    /* 24 */ "...........####.................",
+    /* 25 */ "..........######................"
+  ];
+
+  /* 解析字符图 → 逐行的横向区段。
+     返回 { body: 深色, light: 白色, dark: 瞳孔 } 三组区段。 */
+  function parseArt(art) {
+    var body = [], light = [], dark = [];
+    for (var y = 0; y < art.length; y++) {
+      var line = art[y], b = [], o = [], x = [], i = 0;
+      while (i < line.length) {
+        var ch = line.charAt(i);
+        if (ch === '#' || ch === 'o' || ch === 'x') {
+          var j = i;
+          while (j < line.length && line.charAt(j) === ch) j++;
+          (ch === '#' ? b : ch === 'o' ? o : x).push([i, j]);
+          i = j;
+        } else i++;
+      }
+      body.push(b); light.push(o); dark.push(x);
+    }
+    return { body: body, light: light, dark: dark };
+  }
+  var ART = parseArt(WHALE_ART);
+  var BODY = ART.body;      // 深色鲸身
+  var PATCH = ART.light;    // 白色斑块：腹部 + 眼斑
+  var EYE = ART.dark;       // 瞳孔：最后画，压在白斑之上
+
+  function drawWhale() {
+    var svg = $('#whale'), NS = 'http://www.w3.org/2000/svg';
+    var C_BODY = '#1c2436', C_BODY2 = '#243049', C_WHITE = '#eef3ff';
+    function rect(x, y, w, h, fill) {
+      if (w <= 0 || h <= 0) return;
+      var r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', x); r.setAttribute('y', y);
+      r.setAttribute('width', w); r.setAttribute('height', h);
+      r.setAttribute('fill', fill);
+      svg.appendChild(r);
+    }
+    /* 1) 深色鲸身（外缘用稍亮色阶，做出蜷曲的体积感） */
+    BODY.forEach(function (segs, y) {
+      segs.forEach(function (s, i) {
+        rect(s[0], y, s[1] - s[0], 1, (i === 0 ? C_BODY2 : C_BODY));
+      });
+    });
+    /* 2) 白色斑块：腹部 + 眼斑 */
+    PATCH.forEach(function (segs, y) {
+      segs.forEach(function (s) { rect(s[0], y, s[1] - s[0], 1, C_WHITE); });
+    });
+    /* 3) 额外深色细节（瞳孔等）最后画，确保压在白斑之上 */
+    EYE.forEach(function (segs, y) {
+      segs.forEach(function (s) { rect(s[0], y, s[1] - s[0], 1, C_BODY); });
+    });
+  }
+
+  /* ───────── 拖拽 + 位置记忆 ───────── */
+  function placePet() {
+    var pet = $('#pet'); var w = pet.offsetWidth || 96, h = pet.offsetHeight || 118;
+    var left, top;
+    if (st.pos && typeof st.pos.left === 'number' && typeof st.pos.top === 'number') {
+      left = st.pos.left; top = st.pos.top;
+    }
+    else { left = window.innerWidth - w - 28; top = window.innerHeight - h - 64; }
+    left = Math.max(4, Math.min(left, window.innerWidth - w - 4));
+    top = Math.max(4, Math.min(top, window.innerHeight - h - 4));
+    pet.style.left = left + 'px'; pet.style.top = top + 'px';
+    layoutBar(left, top, w, h);
+  }
+  function layoutBar(left, top, w, h) {
+    var bar = $('#bar');
+    var bw = bar.offsetWidth || 114, bh = bar.offsetHeight || 34;
+    var bl = Math.max(4, Math.min(left + w - bw - 2, window.innerWidth - bw - 4));
+    var bt = top - bh - 2; if (bt < 4) bt = top + h + 2;
+    bar.style.left = bl + 'px'; bar.style.top = bt + 'px';
+  }
+  function initDrag() {
+    var pet = $('#pet'), drag = null;
+    pet.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX - pet.offsetLeft, y: e.clientY - pet.offsetTop, moved: false };
+      try { pet.setPointerCapture(e.pointerId); } catch (err) {}
+      pet.classList.add('dragging');
+    });
+    pet.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var w = pet.offsetWidth, h = pet.offsetHeight;
+      var left = Math.max(0, Math.min(e.clientX - drag.x, window.innerWidth - w));
+      var top = Math.max(0, Math.min(e.clientY - drag.y, window.innerHeight - h));
+      pet.style.left = left + 'px'; pet.style.top = top + 'px';
+      layoutBar(left, top, w, h); positionBubble(); positionPanel(); drag.moved = true;
+    });
+    function end() {
+      if (!drag) return;
+      pet.classList.remove('dragging');
+      st.pos = { left: pet.offsetLeft, top: pet.offsetTop }; saveSt();
+      var moved = drag.moved; drag = null;
+      if (!moved) openPanel('history');          // 只是单击 → 打开收件箱
+    }
+    pet.addEventListener('pointerup', end);
+    pet.addEventListener('pointercancel', end);
+    /* 兜底：setPointerCapture 失败时，指针在桌宠外抬起会让 end 收不到，
+       导致桌宠一直粘着鼠标；挂到 window 上，靠 end 里的 !drag 守卫保证幂等。 */
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }
+
+  /* ───────── 气泡 ───────── */
+  var bTimer = null, cur = null;
+  function positionBubble() {
+    var b = $('#bubble'), pet = $('#pet');
+    if (!b.classList.contains('show')) return;
+    var pw = pet.offsetWidth, ph = pet.offsetHeight;
+    var bx = pet.offsetLeft, by = pet.offsetTop;
+    var bw = b.offsetWidth || 356, bh = b.offsetHeight || 240;
+    var left = bx + pw + 8;
+    if (left + bw > window.innerWidth - 8) left = bx - bw - 8;
+    left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+    var top = Math.max(8, Math.min(by + ph - bh - 8, window.innerHeight - bh - 8));
+    b.style.left = left + 'px'; b.style.top = top + 'px';
+  }
+  /* 面板与气泡同源定位：默认贴在桌宠右上，放不下就翻到另一侧 */
+  function positionPanel() {
+    var p = $('#panel'), pet = $('#pet');
+    if (!p.classList.contains('show')) return;
+    var pw = pet.offsetWidth, ph = pet.offsetHeight;
+    var bx = pet.offsetLeft, by = pet.offsetTop;
+    var w = p.offsetWidth || 356, h = p.offsetHeight || 360;
+    var left = bx + pw + 8;
+    if (left + w > window.innerWidth - 8) left = bx - w - 8;
+    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+    var top = Math.max(8, Math.min(by + ph - h, window.innerHeight - h - 8));
+    p.style.left = left + 'px'; p.style.top = top + 'px';
+  }
+  function showBubble(it, opts) {
+    opts = opts || {}; cur = it;
+    $('#panel').classList.remove('show');   // 气泡与面板互斥：同时开会互相遮挡
+    $('#bTag').textContent = it.kicker || ('第 ' + (ISSUES.indexOf(it) + 1) + ' 期');
+    $('#bMsg').innerHTML = it.msg || ('新的一期速览做好了：<b>' + it.range + '</b>');
+    $('#bFileT').textContent = String(it.file).replace(/^.*\//, '');
+    // 副标题只放区间和体积：右侧已有「打开 ↗」，再写"点击打开"会被裁成残字
+    $('#bFileS').textContent = it.range + (it.size ? ' · ' + it.size : '');
+    $('#bFile').setAttribute('href', it.file);
+
+    /* 勘误 / 补充 */
+    var box = $('#bErr'); box.innerHTML = '';
+    var er = it.erratum || {};
+    var nc = (er.corrections || []).length, ns = (er.supplements || []).length;
+    if (nc + ns > 0) {
+      var head = ns > 0 && nc === 0 ? ('补充同期遗漏 · ' + ns + ' 项')
+               : nc > 0 && ns === 0 ? ('对上一期复核 · ' + nc + ' 项更正')
+               : ('对上一期复核 · ' + nc + ' 项更正 + ' + ns + ' 项补充');
+      var h = '<div class="erratum"><div class="eh">🔍 ' + head + '</div><div class="eb">';
+      if (it.errataIntro) h += '<div class="lead">' + it.errataIntro + '</div>';
+      h += '<ul>';
+      (er.corrections || []).forEach(function (c) {
+        h += '<li>❌ <b>更正</b>：' + c.wrong + '<br>✅ <b>应为</b>：' + c.right + '</li>';
+      });
+      (er.supplements || []).forEach(function (s) { h += '<li>➕ <b>补充</b>：' + s + '</li>'; });
+      h += '</ul></div></div>';
+      box.innerHTML = h;
+    }
+
+    var b = $('#bubble'); b.classList.add('show');
+    requestAnimationFrame(positionBubble); setTimeout(positionBubble, 30);
+
+    var ms = opts.hold != null ? opts.hold : cfg.autoCollapseMs;
+    var wrap = $('#cdWrap');
+    wrap.classList.remove('run'); void wrap.offsetWidth;
+    if (ms > 0) {
+      wrap.classList.add('run');
+      wrap.style.setProperty('--cddur', ms + 'ms');
+      $('#bFine').textContent = '约 ' + Math.round(ms / 1000) + ' 秒后自动收起；收起后 📬 上会留红点';
+    } else { $('#bFine').textContent = '点开文件后我会自动收起'; }
+    clearTimeout(bTimer);
+    bTimer = setTimeout(function () { collapse('timeout'); }, ms);
+  }
+  function collapse(reason) {
+    var b = $('#bubble');
+    if (!b.classList.contains('show')) return;
+    b.classList.remove('show');
+    clearTimeout(bTimer);
+    $('#cdWrap').classList.remove('run');
+    if (reason === 'timeout' && cur && st.seen.indexOf(cur.id) < 0 &&
+        st.unreadIds.indexOf(cur.id) < 0) {
+      st.unreadIds.push(cur.id);        // 按期去重：同一期只记一次未读
+      saveSt(); paintMail();
+      toast('没点开，我先收起来了，📬 上有红点');
+    }
+  }
+
+  function findIssue(id) {
+    for (var i = 0; i < ISSUES.length; i++) { if (ISSUES[i].id === id) return ISSUES[i]; }
+    return null;
+  }
+  function openIssue(it) {
+    markSeen(it.id); collapse('opened');
+    try {
+      var w = window.open(it.file, '_blank');
+      if (!w) toast('浏览器拦截了新窗口，请允许弹出窗口');
+    } catch (e) { toast('打不开？把 ' + it.file + ' 直接拖进浏览器'); }
+  }
+
+  /* ───────── 面板 ───────── */
+  function openPanel(which) {
+    var body = $('#pBody'), now = new Date();
+    collapse('manual');        // 气泡与面板互斥：开面板就收起气泡（不计未读）
+    if (which === 'history') {
+      $('#pIcon').textContent = '🗂'; $('#pTitle').textContent = '期数清单';
+      var h = '';
+      ISSUES.forEach(function (it) {
+        var p = plannedAt(it, cfg), ready = p && p.getTime() <= now.getTime();
+        var unread = st.unreadIds.indexOf(it.id) >= 0;   // 与 📬 红点同源，避免两处口径不一致
+        h += '<div class="row" data-id="' + it.id + '">' +
+               '<span class="d">' + it.range.replace(/\s/g, '') + '</span>' +
+               '<span class="m"><span class="a">' + (it.kicker || it.range) + '</span>' +
+               '<span class="b">' + (it.size || '') + (unread ? ' · <span style="color:var(--hot)">未读</span>' : '') + '</span></span>' +
+               (ready ? '<span class="s ready">已就绪</span>'
+                      : '<span class="s planned">' + (p ? fmtDT(p) : '待定') + '</span>') +
+             '</div>';
+      });
+      var nd = nextDelivery(cfg, now);
+      h += '<h4>下一次自动投递</h4>' +
+           '<div class="kv"><span class="k">时刻</span><span class="v">' + fmtDT(nd) + '（' + WEEK[nd.getDay()] + '）</span></div>' +
+           '<div class="kv"><span class="k">距今</span><span class="v" id="cdNext">' + until(nd - now) + '</span></div>' +
+           '<div class="note">点任意一期即可用浏览器打开。红点只统计「到点投递但你没点开」的期数。</div>';
+      body.innerHTML = h;
+      Array.prototype.forEach.call(body.querySelectorAll('.row'), function (row) {
+        row.addEventListener('click', function () {
+          var it = findIssue(row.getAttribute('data-id')); if (it) openIssue(it);
+        });
+      });
+    } else {
+      $('#pIcon').textContent = '⚙'; $('#pTitle').textContent = '设置';
+      body.innerHTML =
+        '<h4>投递时间</h4>' +
+        '<div class="kv"><span class="k">每周</span><span class="v">' + WEEK[cfg.weekday] + '</span></div>' +
+        '<div class="kv"><span class="k">时刻</span><span class="v">' + pad2(cfg.hour) + ':' + pad2(cfg.minute) + '</span></div>' +
+        '<div class="note">按本机本地时间。要改时间，编辑本文件 DEFAULT_CFG 里的 weekday / hour / minute。</div>' +
+        '<h4>外观</h4>' +
+        '<label class="sw"><input type="checkbox" id="swInk"' + (cfg.avatar === 'ink' ? ' checked' : '') + '> 用透明底头像（去掉浅色方块）</label>' +
+        '<label class="sw"><input type="checkbox" id="swStage"' + (cfg.stage ? ' checked' : '') + '> 显示演示背景</label>' +
+        '<h4>交互</h4>' +
+        '<label class="sw"><input type="checkbox" id="swSound"' + (cfg.sound ? ' checked' : '') + '> 投递时响一声</label>' +
+        '<div class="kv"><span class="k">气泡停留</span><span class="v">' + Math.round(cfg.autoCollapseMs / 1000) + ' 秒</span></div>' +
+        '<h4>数据</h4>' +
+        '<div class="kv"><span class="k">期数</span><span class="v">' + ISSUES.length + ' 期</span></div>' +
+        '<div class="kv"><span class="k">已投递</span><span class="v">' + st.delivered.length + ' 期</span></div>' +
+        '<div class="kv"><span class="k">未读红点</span><span class="v">' + st.unreadIds.length + '</span></div>' +
+        '<div class="btnrow">' +
+          '<button class="btn primary" id="btnTest">模拟一次投递</button>' +
+          '<button class="btn" id="btnReset">重置投递 / 已读记录</button>' +
+        '</div>' +
+        '<div class="note">「模拟一次投递」立刻预览气泡效果。若模拟的气泡超时未点，会按同一期记 1 次未读（不会重复累加）。</div>';
+      $('#swInk').addEventListener('change', function (e) {
+        cfg.avatar = e.target.checked ? 'ink' : 'official';
+        saveCfg(); applyWhale();
+      });
+      $('#swStage').addEventListener('change', function (e) {
+        cfg.stage = e.target.checked; document.body.classList.toggle('stage', cfg.stage); saveCfg();
+      });
+      $('#swSound').addEventListener('change', function (e) { cfg.sound = e.target.checked; saveCfg(); });
+      $('#btnTest').addEventListener('click', function () {
+        if (!ISSUES.length) { toast('还没有任何期数'); return; }
+        showBubble(ISSUES[0], { hold: Math.max(cfg.autoCollapseMs, 12000) });
+      });
+      $('#btnReset').addEventListener('click', function () {
+        st = { delivered: [], seen: [], unreadIds: [], pos: st.pos }; saveSt(); paintMail();
+        toast('已重置'); openPanel('history');
+      });
+    }
+    $('#panel').classList.add('show');
+    requestAnimationFrame(positionPanel);
+    setTimeout(positionPanel, 30);
+  }
+
+  /* ───────── 定时检查 ───────── */
+  function beep() {
+    try {
+      var C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+      var ac = new C(), o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(ac.destination); o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.12, ac.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.32);
+      o.start(); o.stop(ac.currentTime + 0.34);
+    } catch (e) {}
+  }
+  /* 统计还有几期已到点但未投递（用于积压时给出提示，避免旧期数被静默跳过） */
+  function backlogCount(now) {
+    var n = 0;
+    ISSUES.forEach(function (it) {
+      var p = plannedAt(it, cfg);
+      if (p && p.getTime() <= now.getTime() && st.delivered.indexOf(it.id) < 0) n++;
+    });
+    return n;
+  }
+  function tick() {
+    var now = new Date();
+    var due = dueIssue(cfg, st, now);
+    if (due) {
+      markDelivered(due.id);
+      showBubble(due);
+      if (cfg.sound) beep();
+      /* 若同时还有更早的期数积压，明确告诉用户，别让它无声消失 */
+      var rest = backlogCount(now);
+      if (rest > 0) toast('另有 ' + rest + ' 期也已到投递时间，点 🗂 查看');
+      try {
+        if (window.Notification && Notification.permission === 'granted') {
+          new Notification('全球一周速览 · ' + due.range, { body: '新的一期已投递，点开桌宠查看' });
+        }
+      } catch (e) {}
+    }
+    var el = document.getElementById('cdNext');
+    if (el) el.textContent = until(nextDelivery(cfg, now) - now);
+  }
+
+  /* ───────── 启动 ───────── */
+  function boot() {
+    document.body.classList.toggle('stage', !!cfg.stage);
+    drawWhale();   // 先画好兜底图，官方原图加载成功后会自动盖在它上面
+    applyWhale();
+    initDrag(); placePet(); paintMail();
+
+    $('#bClose').addEventListener('click', function () { collapse('manual'); });
+    $('#bFile').addEventListener('click', function (e) {
+      e.preventDefault(); if (cur) openIssue(cur);
+    });
+    $('#btnMail').addEventListener('click', function () {
+      var latest = null;
+      for (var i = 0; i < ISSUES.length; i++) {
+        var p = plannedAt(ISSUES[i], cfg);
+        if (p && p.getTime() <= Date.now()) { latest = ISSUES[i]; break; }
+      }
+      if (latest) showBubble(latest);
+      else { toast('还没到投递时间'); openPanel('history'); }
+    });
+    $('#btnHist').addEventListener('click', function () { openPanel('history'); });
+    $('#btnCfg').addEventListener('click', function () { openPanel('settings'); });
+    $('#pClose').addEventListener('click', function () { $('#panel').classList.remove('show'); });
+
+    window.addEventListener('resize', function () { placePet(); positionBubble(); positionPanel(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { collapse('manual'); $('#panel').classList.remove('show'); }
+    });
+
+    tick();
+    setInterval(tick, 15000);                                  // 每 15 秒查一次
+    document.addEventListener('visibilitychange', function () {  // 休眠/切标签回来后立刻补查
+      if (!document.hidden) tick();
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+</body>
+</html>

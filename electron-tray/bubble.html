@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>全球一周速览</title>
+<style>
+/* ── 浅色（白底）主题：与浅色任务栏/桌面协调 ───────────────────── */
+:root{
+  --surf:#ffffff;  --surf2:#f5f7fb;  --surf3:#eef1f7;
+  --line:#e4e9f1;  --line2:#ccd5e3;
+  --fg:#131a2a;    --fg2:#4a5568;    --fg3:#8b95a8;
+  --brand:#0d9488; --brand2:#0891b2;
+  --hot:#e11d48;   --warn:#b45309;
+  --warnbg:rgba(217,119,6,.08);  --warnline:rgba(217,119,6,.30);
+  --r:16px; --r2:11px;
+  --sh:0 18px 46px rgba(16,24,40,.20), 0 2px 10px rgba(16,24,40,.10);
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:transparent;overflow:hidden;
+  font-family:var(--sans);color:var(--fg);-webkit-font-smoothing:antialiased}
+#stage{height:100%;display:flex;align-items:flex-end;justify-content:flex-end;padding:14px}
+#card{
+  width:100%;max-height:100%;display:flex;flex-direction:column;
+  background:var(--surf);border:1px solid var(--line2);border-radius:var(--r);
+  box-shadow:var(--sh);overflow:hidden;
+  opacity:0;transform:translateY(14px) scale(.97);
+  transition:opacity .22s ease, transform .22s cubic-bezier(.2,.9,.3,1.2);
+}
+#card.show{opacity:1;transform:none}
+
+/* 头部：鲸鱼 + 标题 + 拖动区 + 关闭 */
+#hd{display:flex;align-items:center;gap:10px;padding:11px 13px;
+  background:linear-gradient(180deg,#ffffff,var(--surf2));
+  border-bottom:1px solid var(--line);-webkit-app-region:drag;cursor:default}
+#hd img{width:26px;height:26px;display:block;object-fit:contain;-webkit-user-drag:none}
+#hd .who{font-weight:700;font-size:13.5px;color:var(--fg)}
+#hd .tag{font:600 10px/1 var(--mono);letter-spacing:.05em;padding:3px 7px;border-radius:6px;
+  background:rgba(13,148,136,.10);color:var(--brand);border:1px solid rgba(13,148,136,.28);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+#hd .x{margin-left:auto;-webkit-app-region:no-drag;cursor:pointer;color:var(--fg3);
+  font-size:17px;line-height:1;padding:2px 5px;border-radius:6px}
+#hd .x:hover{color:var(--fg);background:var(--surf3)}
+
+.cd{height:3px;background:var(--line);overflow:hidden;flex:none}
+.cd i{display:block;height:100%;width:100%;transform-origin:left;
+  background:linear-gradient(90deg,var(--brand),var(--brand2))}
+.cd.run i{animation:shrink var(--cddur,12000ms) linear forwards}
+.cd.pause i{animation-play-state:paused}
+@keyframes shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+#bd{padding:14px;overflow-y:auto;flex:1}
+#bd::-webkit-scrollbar{width:8px}
+#bd::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+#msg{margin:0 0 12px;font-size:13.5px;line-height:1.75;color:var(--fg2)}
+#msg b{color:var(--fg)}
+#msg .hl{color:var(--brand);font-weight:700}
+
+/* 文件卡 */
+#file{display:flex;gap:11px;align-items:center;padding:12px;text-decoration:none;color:inherit;
+  background:var(--surf2);border:1px solid var(--line);border-radius:var(--r2);
+  cursor:pointer;transition:.16s}
+#file:hover{border-color:var(--brand);background:var(--surf3);transform:translateY(-1px)}
+#file .ic{flex:none;width:40px;height:40px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(140deg,rgba(13,148,136,.14),rgba(8,145,178,.10));
+  border:1px solid rgba(13,148,136,.26);font-size:19px}
+#file .n{flex:1;min-width:0}
+#file .n .t{display:block;font-weight:700;font-size:13px;color:var(--fg);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#file .n .s{display:block;font:500 11px/1.5 var(--mono);color:var(--fg3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#file .go{flex:none;font-size:11px;color:var(--brand);font-weight:700;white-space:nowrap}
+#file.missing{border-color:rgba(225,29,72,.45)}
+#file.missing .go{color:var(--hot)}
+
+/* 勘误 / 补充 */
+#err .erratum{margin-top:12px;border-radius:var(--r2);overflow:hidden;
+  border:1px solid var(--warnline);background:var(--warnbg)}
+#err .eh{display:flex;align-items:center;gap:7px;padding:8px 11px;
+  background:rgba(217,119,6,.10);font:700 11px/1 var(--mono);letter-spacing:.05em;color:var(--warn)}
+#err .eb{padding:10px 11px;font-size:12.5px;line-height:1.7;color:var(--fg2)}
+#err .eb ul{margin:0;padding-left:16px}
+#err .eb li{margin-bottom:6px}
+#err .eb li:last-child{margin-bottom:0}
+#err .eb b{color:var(--fg)}
+#err .lead{color:var(--fg3);margin-bottom:7px;font-size:12px}
+
+#fine{margin:10px 0 0;font-size:11.5px;color:var(--fg3);text-align:center}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="card">
+    <div id="hd">
+      <img id="avatar" alt="">
+      <span class="who">全球一周速览</span>
+      <span class="tag" id="tag">第 1 期</span>
+      <span class="x" id="close" title="收起">✕</span>
+    </div>
+    <div class="cd" id="cdWrap"><i id="cdBar"></i></div>
+    <div id="bd">
+      <p id="msg"></p>
+      <a id="file" href="#">
+        <span class="ic">📄</span>
+        <span class="n"><span class="t" id="fileT">速览.html</span><span class="s" id="fileS"></span></span>
+        <span class="go" id="fileGo">打开 ↗</span>
+      </a>
+      <div id="err"></div>
+      <p id="fine"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+let current = null, autoHideMs = 12000, hideArmed = false;
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+/* msg 允许有限的富文本：只白名单 <b> 与 <span class="hl">，其余一律转义 */
+function safeMsg(s) {
+  return esc(s)
+    .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
+    .replace(/&lt;span class="hl"&gt;/g, '<span class="hl">')
+    .replace(/&lt;\/span&gt;/g, '</span>');
+}
+
+function renderErratum(it) {
+  const er = it.erratum || {};
+  const nc = (er.corrections || []).length, ns = (er.supplements || []).length;
+  const box = $('#err');
+  if (nc + ns === 0) { box.innerHTML = ''; return; }
+  const head = ns > 0 && nc === 0 ? `补充同期遗漏 · ${ns} 项`
+             : nc > 0 && ns === 0 ? `对上一期复核 · ${nc} 项更正`
+             : `对上一期复核 · ${nc} 项更正 + ${ns} 项补充`;
+  let h = `<div class="erratum"><div class="eh">🔍 ${esc(head)}</div><div class="eb">`;
+  if (it.errataIntro) h += `<div class="lead">${esc(it.errataIntro)}</div>`;
+  h += '<ul>';
+  (er.corrections || []).forEach(c => {
+    h += `<li>❌ <b>更正</b>：${esc(c.wrong)}<br>✅ <b>应为</b>：${esc(c.right)}</li>`;
+  });
+  (er.supplements || []).forEach(s => { h += `<li>➕ <b>补充</b>：${esc(s)}</li>`; });
+  h += '</ul></div></div>';
+  box.innerHTML = h;
+}
+
+function show(payload) {
+  const it = payload.issue;
+  current = it;
+  autoHideMs = payload.autoHideMs;
+
+  $('#avatar').src = payload.avatarUrl || '';
+  $('#avatar').onerror = function () { this.style.visibility = 'hidden'; };
+  $('#tag').textContent = it.kicker || it.range;
+  $('#msg').innerHTML = safeMsg(it.msg) || `新的一期速览做好了：<b>${esc(it.range)}</b>`;
+  $('#fileT').textContent = it.file;
+  $('#fileS').textContent = it.range + (it.size ? ' · ' + it.size : '');
+  $('#fileGo').textContent = it.exists ? '打开 ↗' : '文件缺失';
+  $('#file').classList.toggle('missing', !it.exists);
+  renderErratum(it);
+
+  const card = $('#card');
+  card.classList.remove('show');
+  void card.offsetWidth;
+  card.classList.add('show');
+
+  const wrap = $('#cdWrap');
+  wrap.classList.remove('run', 'pause');
+  void wrap.offsetWidth;
+  if (autoHideMs > 0) {
+    wrap.classList.add('run');
+    wrap.style.setProperty('--cddur', autoHideMs + 'ms');
+    $('#fine').textContent = `约 ${Math.round(autoHideMs / 1000)} 秒后自动收起`;
+  } else {
+    $('#fine').textContent = '点开文件后我会自动收起';
+  }
+  hideArmed = true;
+}
+
+/* ── 交互 ── */
+$('#close').addEventListener('click', () => { hideArmed = false; pet.collapse(); });
+$('#file').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (!current || !current.exists) return;
+  hideArmed = false;
+  pet.openIssue(current.absPath);
+});
+document.addEventListener('mouseenter', () => { if (hideArmed) pet.keepOpen(); });
+document.addEventListener('mouseleave', () => { if (hideArmed && autoHideMs > 0) pet.rearm(autoHideMs); });
+
+/* ── 主进程消息 ── */
+window.__petListeners = 0;
+try {
+  pet.onIssue(function (p) { window.__lastPayload = p && p.issue ? p.issue.id : null; show(p); });
+  pet.onAvatar(url => { $('#avatar').src = url; $('#avatar').style.visibility = 'visible'; });
+  window.__petListeners = 2;
+} catch (e) {
+  window.__petError = String(e && e.message || e);
+}
+</script>
+</body>
+</html>
