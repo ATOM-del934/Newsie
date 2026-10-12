@@ -14,17 +14,23 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const PET_DIR = path.resolve(__dirname, '..');           // weeklypet/
-const PET_HTML = path.join(PET_DIR, 'index.html');
-const ISSUES_DIR = path.join(PET_DIR, 'issues');
+/* 内容根目录：index.html / issues / assets 所在的那一层。
+   开发时是 electron-tray 的上级目录；打包后 packager 用 --extra-resource
+   把这些内容放进 resources/，由 main.js 调 setBaseDir() 指过去。
+   这里刻意不 require('electron')，保持本模块是纯 Node，可独立测试。 */
+let BASE = path.resolve(__dirname, '..');
+function setBaseDir(dir) { if (dir) BASE = dir; }
+function baseDir() { return BASE; }
+function petHtmlPath() { return path.join(BASE, 'index.html'); }
+function issuesDirPath() { return path.join(BASE, 'issues'); }
 
 /** 从桌宠 index.html 里抽出 ISSUES 字面量；失败返回 null */
 function loadIssuesFromPet() {
   let html;
   try {
-    html = fs.readFileSync(PET_HTML, 'utf8');
+    html = fs.readFileSync(petHtmlPath(), 'utf8');
   } catch (e) {
-    return { error: `读不到 ${PET_HTML}：${e.message}` };
+    return { error: `读不到 ${petHtmlPath()}：${e.message}` };
   }
   // 匹配 var ISSUES = [ ... ];  —— 数组里不可能出现 "];" 这种序列
   const m = html.match(/var\s+ISSUES\s*=\s*(\[[\s\S]*?\n\s*\];)/);
@@ -43,9 +49,9 @@ function loadIssuesFromPet() {
   }
 }
 
-/** 把 file 字段（相对 weeklypet/ 的路径）解析成绝对路径 */
+/** 把 file 字段（相对内容根目录的路径）解析成绝对路径 */
 function absoluteIssuePath(issue) {
-  return path.resolve(PET_DIR, issue.file);
+  return path.resolve(BASE, issue.file);
 }
 
 /**
@@ -103,11 +109,16 @@ function issueFileExists(issue) {
 }
 
 function listIssueFiles() {
-  try { return fs.readdirSync(ISSUES_DIR); } catch (e) { return []; }
+  try { return fs.readdirSync(issuesDirPath()); } catch (e) { return []; }
 }
 
 module.exports = {
-  PET_DIR, PET_HTML, ISSUES_DIR,
+  /* 这三个用 getter 而不是普通属性：setBaseDir() 之后调用方读到的必须是最新值，
+     否则菜单里「打开 issues 文件夹」会指向开发时的旧路径。 */
+  get PET_DIR() { return BASE; },
+  get PET_HTML() { return petHtmlPath(); },
+  get ISSUES_DIR() { return issuesDirPath(); },
+  setBaseDir, baseDir,
   loadIssuesFromPet, absoluteIssuePath, endDate, plannedAt, nextDelivery,
   dueIssues, issueFileExists, listIssueFiles
 };

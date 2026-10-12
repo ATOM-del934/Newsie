@@ -5,6 +5,13 @@
 > **零后端、零服务器、零账号** —— 内容是你自己的 HTML 文件，它只负责按时端上来。
 
 <p align="center">
+  <b><a href="https://github.com/ATOM-del934/Newsie/releases/latest/download/Newsie-win32-x64.zip">⬇ 下载 Windows 免安装版</a></b>
+  &nbsp;·&nbsp;
+  <b><a href="https://atom-del934.github.io/Newsie/">▶ 在线试用网页版</a></b>
+  <br><sub>下载即用，不需要装 Node.js。仅 Windows x64；网页版任何系统都能开。</sub>
+</p>
+
+<p align="center">
   <img src="docs/preview-pet.png" width="130" alt="桌宠">&nbsp;&nbsp;&nbsp;
   <img src="docs/preview-popup.png" width="300" alt="投递气泡">
 </p>
@@ -39,21 +46,37 @@ Jump to the [English summary](#english-summary).
 
 ## 快速开始
 
-### 网页版
+### ① 直接下载（Windows，最省事）
 
-双击 `index.html`。就这样。
+[**⬇ 下载 Newsie-win32-x64.zip**](https://github.com/ATOM-del934/Newsie/releases/latest/download/Newsie-win32-x64.zip)（约 140 MB）
+
+解压到任意目录 → 双击 **Newsie.exe** → 托盘出现桌宠。
+
+**不需要装 Node.js**，运行环境已经打进包里了。
+
+> ⚠️ Windows 会弹出「已保护你的电脑」——因为作者没买代码签名证书（一年要几百到几千元），
+> 所有免费的 Electron 应用都是这样。点 **更多信息** → **仍要运行** 即可。
+>
+> 如果托盘上看不到图标，可能是被 Windows 11 折叠进了 `^` 溢出区，点那个小箭头就能看到。
+
+### ② 网页版（零安装，先试试看）
+
+双击 `index.html`，或者[**在线试用**](https://atom-del934.github.io/Newsie/)。
 
 桌面右下角会出现一只可拖动的桌宠。点它身上的 **📬** 看最新一期，
 **📄** 用浏览器打开，**⋯** 打开设置。
 
-### 托盘版
+> 网页版的限制：**关掉页面就不会推送**。想要「关掉也准点」请用 ① 或 ③。
+
+### ③ 从源码跑托盘版（macOS / Linux 走这条）
 
 需要先装 [Node.js](https://nodejs.org/)（自带 `npm`）与 [pnpm](https://pnpm.io/)。
 用 `npm` 也行，把下面的 `pnpm` 换成 `npm` 即可。
 
 ```bash
-cd electron-tray
-pnpm install      # 首次会下载 Electron，约 230 MB
+git clone https://github.com/ATOM-del934/Newsie.git
+cd Newsie/electron-tray
+pnpm install      # 首次会下载 Electron，约 150 MB
 pnpm start
 ```
 
@@ -63,7 +86,15 @@ pnpm start
 
 - **左键单击**托盘图标 → 弹出最新一期
 - **左键双击** → 用浏览器打开
-- **右键** → 菜单（下一次投递时间、预览气泡、开机自启、切换头像、清除红点…）
+- **右键** → 菜单（下一次投递时间、预览气泡、开机自启、待机动画、清除红点…）
+
+### 自己打包成 exe
+
+```bash
+cd electron-tray
+pnpm install
+pnpm run pack        # 产出 dist/Newsie-win32-x64/，含 Newsie.exe
+```
 
 ### 如果 Electron 下载卡住
 
@@ -229,6 +260,16 @@ assets/tray-dark.png            托盘图标：配深色任务栏
 
 A desktop pet that delivers your own weekly news digest as a **local HTML file**
 every Sunday at 20:00. No server, no account, no network access.
+
+**Get it**
+
+- **Windows, no install** — [download the prebuilt zip](https://github.com/ATOM-del934/Newsie/releases/latest/download/Newsie-win32-x64.zip)
+  (~140 MB), unzip, run `Newsie.exe`. Node.js not required. Windows SmartScreen will
+  warn because the build is unsigned; click *More info* → *Run anyway*. x64 only.
+- **Any OS, in a browser** — [live demo](https://atom-del934.github.io/Newsie/) or open
+  `index.html` locally. Zero dependencies; only delivers while the page is open.
+- **Build from source** — `git clone` then `cd Newsie/electron-tray && pnpm install && pnpm start`.
+  Run `pnpm run pack` to produce your own `Newsie.exe`.
 
 **Two builds**
 

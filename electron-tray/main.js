@@ -18,9 +18,21 @@ const fs = require('fs');
 
 const issuesLib = require('./issues');
 
+/* 内容根目录：index.html / issues / assets 都在这一层。
+   开发时它是 electron-tray 的上级；打包后 packager 只能打包 electron-tray 自己，
+   所以用 --extra-resource 把这三样放进 resources/，这里指过去。
+   两种情况下 issues.js 都通过 setBaseDir() 拿到同一个根。 */
+const CONTENT_DIR = app.isPackaged
+  ? process.resourcesPath
+  : path.resolve(__dirname, '..');
+issuesLib.setBaseDir(CONTENT_DIR);
+
 const PET_DIR = issuesLib.PET_DIR;
-/* 图片资源放在项目根的 assets/，网页版与托盘版共用同一套（避免两份图各自漂移） */
-const ASSET_DIR = path.join(__dirname, '..', 'assets');
+/* 图片资源放在内容根的 assets/，网页版与托盘版共用同一套（避免两份图各自漂移） */
+const ASSET_DIR = path.join(CONTENT_DIR, 'assets');
+/* 调试产物：开发时写在程序目录（方便看）；打包后程序目录只读，改写到用户数据目录 */
+let WRITE_DIR = __dirname;
+try { if (app.isPackaged) WRITE_DIR = app.getPath('userData'); } catch (e) {}
 
 /* ───────── 可调配置 ───────── */
 const DEFAULT_CFG = {
@@ -67,7 +79,7 @@ const saveCfg = () => saveJSON(cfgFile, cfg);
 const saveSt = () => saveJSON(stateFile, st);
 
 /* 调试日志：只在 --selftest / --shot 模式下写，正常运行时不留垃圾 */
-const DBG_FILE = path.join(__dirname, 'debug.log');
+const DBG_FILE = path.join(WRITE_DIR, 'debug.log');
 const DBG_ON = process.argv.includes('--selftest') ||
                process.argv.some(a => a.startsWith('--shot='));
 function dbg(msg) {
@@ -587,7 +599,7 @@ function selftest() {
   // Electron 在 Windows 上不往父控制台写 stdout（GUI 程序脱离控制台），
   // 所以同时落盘一份，便于命令行验证。
   try {
-    fs.writeFileSync(path.join(__dirname, 'selftest.txt'), text + '\n', 'utf8');
+    fs.writeFileSync(path.join(WRITE_DIR, 'selftest.txt'), text + '\n', 'utf8');
   } catch (e) {}
   console.log(text);
 }
@@ -677,8 +689,8 @@ if (!app.requestSingleInstanceLock()) {
       setTimeout(async () => {
         try {
           const dom = await petWin.webContents.executeJavaScript(`(() => {
-            const front = document.querySelector('#stage img:not([aria-hidden])') ||
-                          document.querySelector('#stage img');
+            const imgs = Array.prototype.slice.call(document.querySelectorAll('#stage img'));
+            const front = imgs.filter(i => parseFloat(getComputedStyle(i).opacity) > 0.5)[0] || imgs[0];
             return {
               petSrc: (front && front.src) || '',
               petComplete: front ? front.complete : null,
