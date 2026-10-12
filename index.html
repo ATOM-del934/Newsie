@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -41,20 +41,14 @@ body.stage::before{
   animation:bob 3.4s ease-in-out infinite; transform-origin:50% 100%}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 @media (prefers-reduced-motion:reduce){#pet .bob{animation:none}}
-/* 主图与兜底图必须【重叠】而不是依次排列：两者都绝对定位，
-   主图在上（z-index:1）。原图加载失败时 <img> 会被移除，兜底图自然露出。 */
-/* 主图：DSH 官方图标原图（非像素化）。object-fit:cover 顺手裁掉原图自带的
-   圆角浅色底板边缘，避免深色主题下出现一圈白边。 */
+/* 桌宠主图：两张叠放做交叉淡入（A 在前 B 在后，换帧时交换角色）。
+   素材本身是透明底，所以用 contain 而不是 cover —— 不能裁掉角色的帽子和书本。 */
 #pet img{position:absolute; left:0; top:0; z-index:1;
-  display:block; width:96px; height:96px; object-fit:cover;
-  transform:scale(1.07); border:0;
-  filter:drop-shadow(0 8px 16px rgba(0,0,0,.55)); pointer-events:none}
-/* 兜底：原图加载失败时用手绘字符图渲染的 SVG。
-   注意这里必须是 96×78（= 32:26 的字符图比例），不能跟主图一样用正方形，
-   否则兜底鲸鱼会被额外留出上下空白。 */
-#pet svg{position:absolute; left:0; top:0; z-index:0;
-  display:block; width:96px; height:78px; shape-rendering:crispEdges;
-  filter:drop-shadow(0 8px 16px rgba(0,0,0,.55)); pointer-events:none}
+  display:block; width:96px; height:96px; object-fit:contain;
+  border:0; pointer-events:none;
+  filter:drop-shadow(0 8px 16px rgba(18,20,15,.42));
+  transition:opacity .26s ease}
+#petA{opacity:1} #petB{opacity:0}
 #pet .shadow{position:absolute; left:20px; right:20px; top:94px; height:10px;
   background:radial-gradient(ellipse at center, rgba(0,0,0,.5), transparent 72%); pointer-events:none}
 
@@ -177,19 +171,18 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
   #bubble,#panel{width:calc(100vw - 20px)}
   #pet{width:82px;height:100px}
   #pet img{width:82px;height:82px}
-  #pet svg{width:82px;height:67px}
   #pet .shadow{left:17px;right:17px;top:80px;height:9px}
 }
 </style>
 </head>
 <body class="stage">
 
-<!-- ══════ 桌宠：DSH 官方图标原图 + 手绘字符图兜底 ══════ -->
+<!-- ══════ 桌宠：地球小报童，两张图叠放做交叉淡入 ══════ -->
 <div id="pet" title="拖动我 · 单击打开收件箱">
   <div class="shadow"></div>
   <div class="bob">
-    <img id="whaleImg" alt="DeepSeek Harness 黑鲸" draggable="false">
-    <svg id="whale" viewBox="0 0 32 26" shape-rendering="crispEdges" aria-hidden="true"></svg>
+    <img id="petA" src="assets/pet.png" alt="地球小报童" draggable="false">
+    <img id="petB" alt="" draggable="false" aria-hidden="true">
   </div>
 </div>
 
@@ -259,7 +252,8 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
     autoCollapseMs: 9000,  // 气泡停留多久后自动收起
     stage: true,           // 显示演示背景；关掉=纯透明桌宠
     sound: false,          // 投递时是否响一声
-    avatar: 'official'     // 'official' = 官方原图；'ink' = 抠掉底板、背景透明
+    avatar: 'official'     // 旧字段，保留以兼容老配置
+    ,idleAnim: true        // 桌宠是否播放待机动作（在几个姿势之间缓慢切换）
   };
   var WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   var CFG_KEY = 'weeklypet.cfg.v1', STATE_KEY = 'weeklypet.state.v1';
@@ -386,7 +380,7 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
     } else { b.classList.remove('unread', 'bell'); }
   }
 
-  /* ───────── 头像：优先用 DSH 官方图标原图，失败则退回手绘字符图 ─────────
+  /* ───────── 桌宠形象：数据来源见下（assets/frames/ 的待机动画帧） ─────────
      原图是 1024×1024 的 PNG，位于 DSH 安装目录的 resources 下。
 
      ⚠️ 路径顺序很重要：浏览器能否加载本地文件取决于页面来源：
@@ -394,120 +388,72 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
         - 在 DSH 网页界面里预览 → http://127.0.0.1:19387
           → 浏览器禁止 http 页面加载 file:/// 资源
      相对路径在两种情况下都有效，所以推荐把图片放在本目录。 */
-  var AVATARS = {
-    official: [                                                  // 官方原图（带浅色圆角底板）
-      'whale-official.png',
-      'file:///D:/DeepSeek/DeepSeek%20Harness/resources/icon.png'
-    ],
-    ink: [                                                       // 抠掉底板、背景透明
-      'whale-ink.png',
-      'whale-official.png',
-      'file:///D:/DeepSeek/DeepSeek%20Harness/resources/icon.png'
-    ]
-  };
-  function applyWhale() {
-    var img = $('#whaleImg');
-    if (!img) { drawWhale(); return; }
-    var list = (AVATARS[cfg.avatar] || AVATARS.official).slice();
-    img.style.display = '';
-    var i = 0;
-    /* 用 onerror（而非 addEventListener）避免切换头像时把处理器层层叠加 */
-    img.onerror = function () {
-      i++;
-      if (i < list.length) { img.setAttribute('src', list[i]); }
-      else { img.style.display = 'none'; }   // 全部失败 → 露出下面的 SVG 字符图
-    };
-    img.setAttribute('src', list[0]);
-  }
-
-  /* ───────── 像素鲸鱼（兜底） ─────────
-     形状直接写成下面这张字符图（照着 DSH 官方那只蜷曲虎鲸画的）。
-     只有官方原图加载失败时才会用到它，但形状在源码里肉眼可读、可手改。
-
-        '#' = 深色鲸身      'o' = 白色斑块（腹部 / 眼斑）
-        'x' = 瞳孔（深色，画在白斑之上）   '.' = 透明背景
-
-     两条硬性规则：
-       1) 每行必须正好 32 个字符，少一个字符，后面的像素整体左移，图就歪了
-       2) 'o' 的左右都必须是 '#'，否则那段白色会渲染成漂在鲸鱼外面的白块 */
-  var WHALE_ART = [
-    /*  0 */ ".............###...###..........",
-    /*  1 */ "............#####.#####.........",
-    /*  2 */ ".............####.####..........",
-    /*  3 */ "............###oxo####..........",
-    /*  4 */ "..........#####oo#####..........",
-    /*  5 */ ".......####################.....",
-    /*  6 */ ".....########################...",
-    /*  7 */ "...####oooooo###################",
-    /*  8 */ "..###ooooooooo#################.",
-    /*  9 */ "..#oooooooooooooo##########.....",
-    /* 10 */ "..#ooooooooooooooo#########.....",
-    /* 11 */ "..#oooooooooooooooo########.....",
-    /* 12 */ "..#ooooooooooooooooo#######.....",
-    /* 13 */ "..##ooooooooooooooooo######.....",
-    /* 14 */ "...##oooooooooooooooo#####......",
-    /* 15 */ "....##oooooooooooooo####........",
-    /* 16 */ ".....###oooooooooo###...........",
-    /* 17 */ "......###oooooooo###............",
-    /* 18 */ ".......##oooooooo##.............",
-    /* 19 */ "........##########..............",
-    /* 20 */ ".........########...............",
-    /* 21 */ "..........######................",
-    /* 22 */ "...........####.................",
-    /* 23 */ "............##..................",
-    /* 24 */ "...........####.................",
-    /* 25 */ "..........######................"
+  /* ───────── 桌宠待机动画 ─────────
+     素材分两类，不能混用：
+       · 全身动作帧（read / think / coffee / …）—— 桌宠用它循环。
+         每个动作自带不同表情（读书微笑、打盹闭眼、欢呼大笑），
+         所以循环动作本身就等于"动作 + 表情"都在变。
+       · 只有头的表情帧（happy / wink / …）—— 用于气泡头像，
+         因为没有身体，放到桌宠上会让身子忽隐忽现。
+     图片放在本目录 assets/frames/，用相对路径（见上方说明）。 */
+  var FRAMES = 'assets/frames/';
+  var IDLE_POOL = [
+    ['read', 5], ['think', 3], ['coffee', 3],
+    ['map', 2], ['lookout', 2], ['rest', 1], ['walk', 2]
   ];
+  var FLAT_POOL = [];
+  IDLE_POOL.forEach(function (p) { for (var q = 0; q < p[1]; q++) FLAT_POOL.push(p[0]); });
 
-  /* 解析字符图 → 逐行的横向区段。
-     返回 { body: 深色, light: 白色, dark: 瞳孔 } 三组区段。 */
-  function parseArt(art) {
-    var body = [], light = [], dark = [];
-    for (var y = 0; y < art.length; y++) {
-      var line = art[y], b = [], o = [], x = [], i = 0;
-      while (i < line.length) {
-        var ch = line.charAt(i);
-        if (ch === '#' || ch === 'o' || ch === 'x') {
-          var j = i;
-          while (j < line.length && line.charAt(j) === ch) j++;
-          (ch === '#' ? b : ch === 'o' ? o : x).push([i, j]);
-          i = j;
-        } else i++;
-      }
-      body.push(b); light.push(o); dark.push(x);
-    }
-    return { body: body, light: light, dark: dark };
+  var petFront = $('#petA'), petBack = $('#petB'), petCur = null;
+  var petTimer = null, petBusy = false;
+
+  /* 交叉淡入换帧：新图先预加载，加载好再切，避免闪白 */
+  function petShow(name, fade) {
+    if (!petBack || name === petCur) return;
+    var pre = new Image();
+    pre.onload = function () {
+      petBack.setAttribute('src', FRAMES + name + '.png');
+      var t = (fade == null ? 260 : fade) + 'ms ease';
+      petBack.style.transition = 'opacity ' + t;
+      petFront.style.transition = 'opacity ' + t;
+      petBack.style.opacity = '1';
+      petFront.style.opacity = '0';
+      var sw = petFront; petFront = petBack; petBack = sw;   // 交换角色
+      petCur = name;
+    };
+    pre.onerror = function () { petCur = name; };   // 图坏了就跳过，别卡住循环
+    pre.src = FRAMES + name + '.png';
   }
-  var ART = parseArt(WHALE_ART);
-  var BODY = ART.body;      // 深色鲸身
-  var PATCH = ART.light;    // 白色斑块：腹部 + 眼斑
-  var EYE = ART.dark;       // 瞳孔：最后画，压在白斑之上
-
-  function drawWhale() {
-    var svg = $('#whale'), NS = 'http://www.w3.org/2000/svg';
-    var C_BODY = '#1c2436', C_BODY2 = '#243049', C_WHITE = '#eef3ff';
-    function rect(x, y, w, h, fill) {
-      if (w <= 0 || h <= 0) return;
-      var r = document.createElementNS(NS, 'rect');
-      r.setAttribute('x', x); r.setAttribute('y', y);
-      r.setAttribute('width', w); r.setAttribute('height', h);
-      r.setAttribute('fill', fill);
-      svg.appendChild(r);
-    }
-    /* 1) 深色鲸身（外缘用稍亮色阶，做出蜷曲的体积感） */
-    BODY.forEach(function (segs, y) {
-      segs.forEach(function (s, i) {
-        rect(s[0], y, s[1] - s[0], 1, (i === 0 ? C_BODY2 : C_BODY));
-      });
-    });
-    /* 2) 白色斑块：腹部 + 眼斑 */
-    PATCH.forEach(function (segs, y) {
-      segs.forEach(function (s) { rect(s[0], y, s[1] - s[0], 1, C_WHITE); });
-    });
-    /* 3) 额外深色细节（瞳孔等）最后画，确保压在白斑之上 */
-    EYE.forEach(function (segs, y) {
-      segs.forEach(function (s) { rect(s[0], y, s[1] - s[0], 1, C_BODY); });
-    });
+  function petPick() {
+    var n, guard = 0;
+    do { n = FLAT_POOL[Math.floor(Math.random() * FLAT_POOL.length)]; }
+    while (n === petCur && ++guard < 12);
+    return n;
+  }
+  function petSchedule() {
+    clearTimeout(petTimer);
+    if (!cfg.idleAnim) return;
+    petTimer = setTimeout(function () {
+      if (!petBusy) petShow(petPick(), 420);
+      petSchedule();
+    }, 6000 + Math.random() * 6000);          // 6–12 秒换一个姿势
+  }
+  /* 播一串动作再回到待机（投递、悬停等场合用） */
+  function petPlay(seq, done) {
+    petBusy = true;
+    clearTimeout(petTimer);
+    var i = 0;
+    (function step() {
+      if (i >= seq.length) { petBusy = false; petSchedule(); if (done) done(); return; }
+      var s = seq[i++];
+      petShow(s[0], 240);
+      setTimeout(step, s[1]);
+    })();
+  }
+  function petRestart() {
+    clearTimeout(petTimer);
+    petBusy = false;
+    if (cfg.idleAnim) petSchedule();
   }
 
   /* ───────── 拖拽 + 位置记忆 ───────── */
@@ -590,6 +536,8 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
   }
   function showBubble(it, opts) {
     opts = opts || {}; cur = it;
+    /* 投递时桌宠先"喊一嗓子"再欢呼，然后回到读报 */
+    petPlay([['announce', 1300], ['cheer', 1700], ['read', 300]]);
     $('#panel').classList.remove('show');   // 气泡与面板互斥：同时开会互相遮挡
     $('#bTag').textContent = it.kicker || ('第 ' + (ISSUES.indexOf(it) + 1) + ' 期');
     $('#bMsg').innerHTML = it.msg || ('新的一期速览做好了：<b>' + it.range + '</b>');
@@ -694,7 +642,7 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
         '<div class="kv"><span class="k">时刻</span><span class="v">' + pad2(cfg.hour) + ':' + pad2(cfg.minute) + '</span></div>' +
         '<div class="note">按本机本地时间。要改时间，编辑本文件 DEFAULT_CFG 里的 weekday / hour / minute。</div>' +
         '<h4>外观</h4>' +
-        '<label class="sw"><input type="checkbox" id="swInk"' + (cfg.avatar === 'ink' ? ' checked' : '') + '> 用透明底头像（去掉浅色方块）</label>' +
+        '<label class="sw"><input type="checkbox" id="swIdle"' + (cfg.idleAnim ? ' checked' : '') + '> 待机动作（姿势缓慢切换）</label>' +
         '<label class="sw"><input type="checkbox" id="swStage"' + (cfg.stage ? ' checked' : '') + '> 显示演示背景</label>' +
         '<h4>交互</h4>' +
         '<label class="sw"><input type="checkbox" id="swSound"' + (cfg.sound ? ' checked' : '') + '> 投递时响一声</label>' +
@@ -708,9 +656,9 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
           '<button class="btn" id="btnReset">重置投递 / 已读记录</button>' +
         '</div>' +
         '<div class="note">「模拟一次投递」立刻预览气泡效果。若模拟的气泡超时未点，会按同一期记 1 次未读（不会重复累加）。</div>';
-      $('#swInk').addEventListener('change', function (e) {
-        cfg.avatar = e.target.checked ? 'ink' : 'official';
-        saveCfg(); applyWhale();
+      $('#swIdle').addEventListener('change', function (e) {
+        cfg.idleAnim = e.target.checked;
+        saveCfg(); petRestart();
       });
       $('#swStage').addEventListener('change', function (e) {
         cfg.stage = e.target.checked; document.body.classList.toggle('stage', cfg.stage); saveCfg();
@@ -774,8 +722,8 @@ label.sw input{accent-color:var(--brand); width:15px; height:15px}
   /* ───────── 启动 ───────── */
   function boot() {
     document.body.classList.toggle('stage', !!cfg.stage);
-    drawWhale();   // 先画好兜底图，官方原图加载成功后会自动盖在它上面
-    applyWhale();
+    petShow('read', 0);      // 首帧定在「读报」
+    petRestart();            // 之后按待机节奏换姿势
     initDrag(); placePet(); paintMail();
 
     $('#bClose').addEventListener('click', function () { collapse('manual'); });

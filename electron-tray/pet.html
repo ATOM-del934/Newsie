@@ -7,16 +7,23 @@
   html,body{margin:0;height:100%;background:transparent;overflow:hidden;
     font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
     user-select:none;-webkit-user-select:none}
-  /* 鲸鱼在上、工具栏在下，两者贴紧 */
+  /* 桌宠在上、工具栏在下，两者贴紧 */
   #wrap{position:relative;height:100%;display:flex;flex-direction:column;
     align-items:center;justify-content:flex-start;padding:2px 0 4px}
 
-  /* 鲸鱼本体：整块都是拖动区（原生拖窗，最顺滑）。无阴影。 */
-  #whale{-webkit-app-region:drag;cursor:grab;
-    width:104px;height:104px;display:block;object-fit:contain}
-  #whale:active{cursor:grabbing}
+  /* 画面容器：两张图叠放做交叉淡入，外加一点呼吸起伏 */
+  #stage{position:relative;width:104px;height:104px;-webkit-app-region:drag;cursor:grab}
+  #stage:active{cursor:grabbing}
+  #stage.bob{animation:bob 3.6s ease-in-out infinite}
+  @keyframes bob{
+    0%,100%{transform:translateY(0) rotate(0deg)}
+    50%    {transform:translateY(-3px) rotate(-1deg)}
+  }
+  #stage img{position:absolute;left:0;top:0;width:104px;height:104px;
+    display:block;object-fit:contain;transition:opacity .26s ease}
+  #a{opacity:1} #b{opacity:0}
 
-  /* 工具栏：紧贴在鲸鱼下方，不参与拖动，可点击 */
+  /* 工具栏：紧贴在桌宠下方，不参与拖动，可点击 */
   #bar{display:flex;gap:5px;margin-top:1px;-webkit-app-region:no-drag}
   .b{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;cursor:pointer;
     font-size:13px;line-height:1;color:#4a5568;background:#ffffff;
@@ -28,7 +35,7 @@
     background:#e11d48;box-shadow:0 0 0 2px #ffffff;display:none}
   .b.hot.on::after{display:block}
 
-  /* 悬停提示：浮在顶部，不占布局、不影响间距 */
+  /* 悬停提示：浮在顶部，不占布局 */
   #tip{position:absolute;left:50%;top:0;transform:translateX(-50%);
     font-size:10px;color:#8b95a8;white-space:nowrap;opacity:0;transition:.2s;pointer-events:none}
   body:hover #tip{opacity:1}
@@ -36,7 +43,10 @@
 </head>
 <body>
 <div id="wrap">
-  <img id="whale" alt="DeepSeek Harness 黑鲸" draggable="false">
+  <div id="stage" class="bob">
+    <img id="a" alt="地球小报童" draggable="false">
+    <img id="b" alt="" draggable="false" aria-hidden="true">
+  </div>
   <div id="bar">
     <div class="b hot" id="btnMail" title="查看最新一期">📬</div>
     <div class="b" id="btnOpen" title="用浏览器打开最新一期">📄</div>
@@ -49,18 +59,112 @@
 'use strict';
 const $ = s => document.querySelector(s);
 
-/* 头像由主进程推来（跟随「用透明底头像」设置） */
-window.pet.onAvatar(url => { $('#whale').src = url; });
+/* ────────────────────────────────────────────────────────────────
+   待机动画
+   ────────────────────────────────────────────────────────────────
+   素材分两类，不能混用：
+     · 全身动作帧（read / think / coffee / …）—— 桌宠用它循环
+     · 只有头的表情帧（happy / wink / …）—— 用于托盘图标与气泡头像，
+       因为没有身体，放到桌宠上会让身子忽隐忽现
+   每个动作帧自带不同表情（读书微笑、打盹闭眼、欢呼大笑），
+   所以循环动作本身就等于"动作 + 表情"都在变。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 待机池：悠闲的姿势权重高，走动用低权重偶尔客串 */
+const IDLE_POOL = [
+  ['read', 5], ['think', 3], ['coffee', 3], ['map', 2],
+  ['lookout', 2], ['rest', 1], ['walk', 2]
+];
+const FLAT_POOL = IDLE_POOL.flatMap(([n, w]) => Array(w).fill(n));
+
+let assets = null;          // { dir, idleAnim }
+let current = null;         // 当前帧名
+let front = $('#a'), back = $('#b');
+let idleTimer = null, blinkTimer = null, busy = false;   // busy = 正在播特殊动作
+
+function url(name) { return assets ? assets.dir + name + '.png' : ''; }
+
+/* 交叉淡入换帧 */
+function show(name, fade) {
+  if (!assets || name === current) return;
+  const next = url(name);
+  if (!next) return;
+  const pre = new Image();
+  pre.onload = () => {
+    back.src = next;
+    back.style.transition = 'opacity ' + (fade || 260) + 'ms ease';
+    front.style.transition = 'opacity ' + (fade || 260) + 'ms ease';
+    back.style.opacity = '1';
+    front.style.opacity = '0';
+    const t = front; front = back; back = t;      // 交换角色
+    current = name;
+  };
+  pre.onerror = () => {};
+  pre.src = next;
+}
+
+function pickIdle() {
+  let n, guard = 0;
+  do { n = FLAT_POOL[Math.floor(Math.random() * FLAT_POOL.length)]; }
+  while (n === current && ++guard < 12);
+  return n;
+}
+
+function scheduleIdle() {
+  clearTimeout(idleTimer);
+  if (!assets || !assets.idleAnim) return;
+  const wait = 6000 + Math.random() * 6000;        // 6–12 秒换一个姿势
+  idleTimer = setTimeout(() => {
+    if (!busy) show(pickIdle(), 420);
+    scheduleIdle();
+  }, wait);
+}
+
+/* 播一串动作，然后回到待机（用于投递、悬停等场合） */
+function playSeq(seq, done) {
+  if (!assets) { if (done) done(); return; }
+  busy = true;
+  clearTimeout(idleTimer);
+  let i = 0;
+  (function step() {
+    if (i >= seq.length) {
+      busy = false;
+      scheduleIdle();
+      if (done) done();
+      return;
+    }
+    const [name, ms] = seq[i++];
+    show(name, 240);
+    setTimeout(step, ms);
+  })();
+}
+
+/* ── 主进程消息 ── */
+window.pet.onAssets(a => {
+  assets = a;
+  $('#stage').classList.toggle('bob', !!a.idleAnim);
+  if (!current) { current = null; show('read', 0); }
+  scheduleIdle();
+});
+
+/* 投递新一期时欢呼一下 */
+window.pet.onIssue(() => { playSeq([['announce', 1300], ['cheer', 1800], ['read', 400]]); });
 
 /* 未读红点 */
 window.pet.onUnread(n => { $('#btnMail').classList.toggle('on', n > 0); });
 
-$('#btnMail').addEventListener('click', () => window.pet.showBubble());
+/* 悬停时打个招呼 */
+$('#stage').addEventListener('mouseenter', () => { if (!busy && assets && assets.idleAnim) show('greet', 200); });
+$('#stage').addEventListener('mouseleave', () => { if (!busy) scheduleIdle(); });
+
+$('#btnMail').addEventListener('click', () => { playSeq([['greet', 700], ['cheer', 1200]]); window.pet.showBubble(); });
 $('#btnOpen').addEventListener('click', () => window.pet.openLatest());
 $('#btnMenu').addEventListener('click', () => window.pet.popupMenu());
 
 /* 图片加载失败就藏起来（不至于变成破图） */
-$('#whale').addEventListener('error', function () { this.style.visibility = 'hidden'; });
+['a', 'b'].forEach(id => {
+  $('#' + id).addEventListener('error', function () { this.style.visibility = 'hidden'; });
+});
 </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* preload.js — 渲染进程与主进程之间的安全桥
    只暴露少数几个动作，不把 ipcRenderer / node / require 交出去。
-   气泡窗口（bubble.html）和桌面鲸鱼窗口（pet.html）共用这个 preload。 */
+   气泡窗口（bubble.html）和桌宠窗口（pet.html）共用这个 preload。 */
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('pet', {
   /* ── 气泡窗口用 ── */
   /** 收到一期新内容 */
   onIssue: (fn) => ipcRenderer.on('issue', (_e, payload) => fn(payload)),
+  /** 切换气泡头像 */
+  onAvatar: (fn) => ipcRenderer.on('avatar', (_e, url) => fn(url)),
   /** 打开速览文件（主进程用系统默认浏览器打开） */
   openIssue: (absPath) => ipcRenderer.send('open-issue', absPath),
   /** 手动收起气泡 */
@@ -17,9 +19,9 @@ contextBridge.exposeInMainWorld('pet', {
   /** 鼠标移开：重新计时 */
   rearm: (ms) => ipcRenderer.send('rearm', ms),
 
-  /* ── 桌面鲸鱼窗口用 ── */
-  /** 切换头像 */
-  onAvatar: (fn) => ipcRenderer.on('avatar', (_e, url) => fn(url)),
+  /* ── 桌宠窗口用 ── */
+  /** 拿到动画帧目录与「待机动作」开关 */
+  onAssets: (fn) => ipcRenderer.on('assets', (_e, a) => fn(a)),
   /** 未读数变化（用来点红点） */
   onUnread: (fn) => ipcRenderer.on('unread', (_e, n) => fn(n)),
   /** 显示最新一期气泡 */

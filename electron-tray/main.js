@@ -19,7 +19,8 @@ const fs = require('fs');
 const issuesLib = require('./issues');
 
 const PET_DIR = issuesLib.PET_DIR;
-const ASSET_DIR = path.join(__dirname, 'assets');
+/* 图片资源放在项目根的 assets/，网页版与托盘版共用同一套（避免两份图各自漂移） */
+const ASSET_DIR = path.join(__dirname, '..', 'assets');
 
 /* ───────── 可调配置 ───────── */
 const DEFAULT_CFG = {
@@ -27,9 +28,9 @@ const DEFAULT_CFG = {
   hour: 20,
   minute: 0,
   autoHideMs: 12000,     // 气泡多久后自动收起
-  avatar: 'ink',         // 气泡头像：'ink' = 透明底（默认）；'official' = 带浅色底板
-  trayStyle: 'auto',     // 托盘图标：'auto' 按任务栏明暗自动选；也可 'dark'/'light'/'official'
-  showPet: true,         // 是否在桌面上显示那只可拖动的鲸鱼
+  idleAnim: true,        // 桌宠是否播放待机动作（在几个姿势之间缓慢切换）
+  trayStyle: 'auto',     // 托盘图标：'auto' 按任务栏明暗自动选；也可强制 'dark'/'light'
+  showPet: true,         // 是否在桌面上显示那只可拖动的地球小报童
   autostart: false,
   sound: false
 };
@@ -75,17 +76,22 @@ function dbg(msg) {
 }
 
 /* ───────── 图标 ───────── */
-function iconPath(which) {
-  const ink = path.join(ASSET_DIR, 'whale-ink.png');
-  const off = path.join(ASSET_DIR, 'whale-official.png');
-  if (which === 'official') return fs.existsSync(off) ? off : ink;
-  return fs.existsSync(ink) ? ink : off;
+/* 角色是「地球小报童」，本身就是透明底，不再需要"带底板 / 抠底板"两套。
+   参数保留只是为了不改动调用处。 */
+function iconPath() {
+  const a = path.join(ASSET_DIR, 'pet.png');
+  const b = path.join(ASSET_DIR, 'pet-96.png');
+  return fs.existsSync(a) ? a : b;
 }
 
-/* 托盘图标必须与任务栏明暗形成对比，所以**不能**跟气泡头像共用同一张图。
-   实测（16×16）：whale-ink.png 是透明底深色鲸鱼，覆盖率只有 21%、
-   可见部分平均亮度 94/255 —— 画在深色任务栏上等于看不见。
-   为此单独生成了两张高对比度图标，并按任务栏配色自动选择。 */
+/* 动画帧目录：桌宠在几个姿势之间缓慢切换，来回都从这里取图。 */
+function framesDirUrl() {
+  const dir = path.join(ASSET_DIR, 'frames');
+  return 'file:///' + dir.replace(/\\/g, '/').replace(/ /g, '%20') + '/';
+}
+
+/* 托盘小图标单独出图：16px 下全身动作糊成一团，只能用头部；
+   并且按任务栏明暗各配一版，靠描边与底色拉开对比。 */
 let _lightBarCache = null;
 function detectLightTaskbar() {
   // Windows：任务栏明暗在注册表里，与"应用深色模式"是两套设置，只能查注册表。
@@ -114,19 +120,17 @@ function detectLightTaskbar() {
 }
 function trayIconPath() {
   const style = cfg.trayStyle || 'auto';
-  if (style === 'official') return iconPath('official');
   const lightBar = style === 'auto' ? detectLightTaskbar() : style === 'light';
-  const p = path.join(ASSET_DIR, lightBar ? 'tray-light-bar.png' : 'tray-dark-bar.png');
+  const p = path.join(ASSET_DIR, lightBar ? 'tray-light.png' : 'tray-dark.png');
   if (fs.existsSync(p)) return p;
-  return iconPath('official');       // 兜底：官方底板图在两种任务栏上都看得见
+  return iconPath();
 }
 function trayStyleLabel() {
   const s = cfg.trayStyle || 'auto';
-  const eff = trayIconPath().indexOf('light-bar') >= 0 ? '浅色版' : '深色版';
+  const eff = trayIconPath().indexOf('tray-light') >= 0 ? '浅色版' : '深色版';
   return s === 'auto' ? `托盘图标：自动（现用${eff}）`
        : s === 'light' ? '托盘图标：强制浅色版'
-       : s === 'dark' ? '托盘图标：强制深色版'
-       : '托盘图标：官方底板';
+       : '托盘图标：强制深色版';
 }
 
 /** 托盘图标：按托盘专用图渲染，未读时叠一个红点 */
@@ -236,7 +240,7 @@ function showIssue(issue, opts) {
       errataIntro: issue.errataIntro || ''
     },
     autoHideMs: opts.autoHideMs != null ? opts.autoHideMs : cfg.autoHideMs,
-    avatarUrl: 'file:///' + iconPath(cfg.avatar).replace(/\\/g, '/').replace(/ /g, '%20'),
+    avatarUrl: avatarFileUrl(),
     unread: st.unread
   };
   const send = () => {
@@ -283,11 +287,11 @@ function hideBubble(reason) {
   }
 }
 
-/* ───────── 桌面鲸鱼窗口（真正的"桌宠"）─────────
+/* ───────── 桌宠窗口（真正的"桌宠"）─────────
    托盘图标在时钟旁边，不算"桌面上的桌宠"。这里再开一个无边框透明、
-   始终置顶、不占任务栏的小窗口，把鲸鱼摆在桌面上，可拖动。 */
+   始终置顶、不占任务栏的小窗口，把角色摆在桌面上，可拖动。 */
 let petWin = null;
-const PET_W = 116, PET_H = 140;   // 鲸鱼 104 + 间距 + 工具栏 26 + 内边距
+const PET_W = 116, PET_H = 140;   // 角色 104 + 间距 + 工具栏 26 + 内边距
 
 function petPos() {
   const wa = screen.getPrimaryDisplay().workAreaSize;
@@ -319,7 +323,7 @@ function createPetWindow() {
   petWin.__ready = false;
   petWin.webContents.on('did-finish-load', () => {
     petWin.__ready = true;
-    petWin.webContents.send('avatar', avatarFileUrl());
+    petWin.webContents.send('assets', assetsPayload());
     petWin.webContents.send('unread', st.unread || 0);
     petWin.showInactive();
   });
@@ -382,7 +386,7 @@ function refreshTray() {
   tray.setToolTip(lines.join('\n'));
   tray.setImage(trayIcon(st.unread > 0));
   tray.setContextMenu(Menu.buildFromTemplate(buildMenu(nd)));
-  pushToPet('unread', st.unread || 0);   // 同步桌面鲸鱼上的红点
+  pushToPet('unread', st.unread || 0);   // 同步桌宠上的红点
 }
 
 function buildMenu(nd) {
@@ -413,16 +417,16 @@ function buildMenu(nd) {
     { label: '📂 打开 issues 文件夹', click: () => shell.openPath(issuesLib.ISSUES_DIR) },
     { label: '📂 打开项目文件夹', click: () => shell.openPath(PET_DIR) },
     { type: 'separator' },
-    { label: '显示桌面鲸鱼', type: 'checkbox', checked: cfg.showPet !== false, click: (mi) => {
+    { label: '显示桌宠', type: 'checkbox', checked: cfg.showPet !== false, click: (mi) => {
         cfg.showPet = mi.checked; saveCfg(); showPet(mi.checked); refreshTray();
       } },
     { label: '开机自启', type: 'checkbox', checked: !!cfg.autostart, click: (mi) => {
         cfg.autostart = mi.checked; saveCfg(); applyAutostart(); refreshTray();
       } },
-    { label: '用透明底头像（仅气泡）', type: 'checkbox', checked: cfg.avatar === 'ink', click: (mi) => {
-        cfg.avatar = mi.checked ? 'ink' : 'official'; saveCfg();
-        if (bubbleWin && !bubbleWin.isDestroyed()) {
-          bubbleWin.webContents.send('avatar', avatarFileUrl());
+    { label: '待机动作（姿势缓慢切换）', type: 'checkbox', checked: cfg.idleAnim !== false, click: (mi) => {
+        cfg.idleAnim = mi.checked; saveCfg();
+        if (petWin && !petWin.isDestroyed()) {
+          petWin.webContents.send('assets', assetsPayload());
         }
         refreshTray();
       } },
@@ -431,15 +435,12 @@ function buildMenu(nd) {
     { label: '托盘图标：自动（跟随任务栏）', type: 'radio',
       checked: (cfg.trayStyle || 'auto') === 'auto',
       click: () => { cfg.trayStyle = 'auto'; _lightBarCache = null; saveCfg(); refreshTray(); } },
-    { label: '托盘图标：白色（配深色任务栏）', type: 'radio',
+    { label: '托盘图标：白色描边（配深色任务栏）', type: 'radio',
       checked: cfg.trayStyle === 'dark',
       click: () => { cfg.trayStyle = 'dark'; saveCfg(); refreshTray(); } },
     { label: '托盘图标：深色描边（配浅色任务栏）', type: 'radio',
       checked: cfg.trayStyle === 'light',
       click: () => { cfg.trayStyle = 'light'; saveCfg(); refreshTray(); } },
-    { label: '托盘图标：官方底板', type: 'radio',
-      checked: cfg.trayStyle === 'official',
-      click: () => { cfg.trayStyle = 'official'; saveCfg(); refreshTray(); } },
     { label: '↻ 重新检测任务栏配色', click: () => {
         _lightBarCache = null;
         notify('已重新检测：' + (detectLightTaskbar() ? '浅色任务栏' : '深色任务栏'));
@@ -455,7 +456,11 @@ function buildMenu(nd) {
 }
 
 function avatarFileUrl() {
-  return 'file:///' + iconPath(cfg.avatar).replace(/\\/g, '/').replace(/ /g, '%20');
+  return 'file:///' + iconPath().replace(/\\/g, '/').replace(/ /g, '%20');
+}
+/* 桌宠窗口需要知道去哪里取动画帧，以及是否播放待机动作 */
+function assetsPayload() {
+  return { dir: framesDirUrl(), idleAnim: cfg.idleAnim !== false };
 }
 
 function notify(body, title) {
@@ -530,7 +535,7 @@ ipcMain.on('collapse', () => hideBubble('manual'));
 ipcMain.on('keep-open', () => clearTimeout(hideTimer));   // 鼠标悬停时不要收
 ipcMain.on('rearm', (_e, ms) => armHideTimer(ms));
 
-/* 桌面鲸鱼窗口的三个动作 */
+/* 桌宠窗口的三个动作 */
 ipcMain.on('pet:show-bubble', () => {
   const latest = (issuesLib.loadIssuesFromPet().list || [])[0];
   if (latest) showIssue(latest);
@@ -568,8 +573,11 @@ function selftest() {
   out.push(`INFO  托盘图标实际文件：${path.basename(trayIconPath())}`);
   const due = issuesLib.dueIssues(cfg, [], new Date());
   out.push(`INFO  以"什么都没投递过"计算，当前已到点的期数：${due.length}`);
-  out.push(`INFO  图标路径（ink）：${iconPath('ink')}`);
-  out.push(`INFO  图标路径（official）：${iconPath('official')}`);
+  out.push(`INFO  桌宠主体图：${path.basename(iconPath())}`);
+  const fdir = path.join(ASSET_DIR, 'frames');
+  let nFrames = 0;
+  try { nFrames = fs.readdirSync(fdir).filter(f => /\.png$/i.test(f)).length; } catch (e) {}
+  out.push(`INFO  待机动画帧：${nFrames} 张（assets/frames/），待机动作=${cfg.idleAnim !== false ? '开' : '关'}`);
   out.push(`INFO  项目目录：${PET_DIR}`);
   out.push(`INFO  期数清单来源：${issuesLib.PET_HTML}`);
   const text = out.join('\n');
@@ -655,7 +663,7 @@ if (!app.requestSingleInstanceLock()) {
       return;
     }
 
-    // --shot-pet=<path>：抓桌面鲸鱼窗口，用于确认它不是空白的
+    // --shot-pet=<path>：抓桌宠窗口，用于确认它不是空白的
     const shotPetArg = process.argv.find(a => a.startsWith('--shot-pet='));
     if (shotPetArg) {
       const outFile = shotPetArg.slice('--shot-pet='.length);
@@ -666,13 +674,14 @@ if (!app.requestSingleInstanceLock()) {
       setTimeout(async () => {
         try {
           const dom = await petWin.webContents.executeJavaScript(`(() => {
-            const img = document.querySelector('#whale');
+            const front = document.querySelector('#stage img:not([aria-hidden])') ||
+                          document.querySelector('#stage img');
             return {
-              whaleSrc: (img && img.src) || '',
-              whaleComplete: img ? img.complete : null,
-              whaleNaturalW: img ? img.naturalWidth : null,
-              whaleVisible: img ? getComputedStyle(img).visibility : null,
-              whaleRect: img ? JSON.stringify(img.getBoundingClientRect()) : '',
+              petSrc: (front && front.src) || '',
+              petComplete: front ? front.complete : null,
+              petNaturalW: front ? front.naturalWidth : null,
+              petVisible: front ? getComputedStyle(front).visibility : null,
+              petRect: front ? JSON.stringify(front.getBoundingClientRect()) : '',
               bodyText: document.body.innerText,
               rect: JSON.stringify({w: innerWidth, h: innerHeight})
             };
@@ -680,7 +689,7 @@ if (!app.requestSingleInstanceLock()) {
           fs.writeFileSync(outFile.replace(/\.png$/, '.json'), JSON.stringify(dom, null, 2), 'utf8');
           const img = await petWin.webContents.capturePage();
           fs.writeFileSync(outFile, img.toPNG());
-          console.log('已写出桌面鲸鱼截图 ' + outFile);
+          console.log('已写出桌宠截图 ' + outFile);
         } catch (e) { console.error('截图失败: ' + e.message); }
         app.exit(0);
       }, 1800);
@@ -700,7 +709,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     refreshTray();
     scheduleNext();
-    showPet(cfg.showPet !== false);        // 桌面鲸鱼：默认显示
+    showPet(cfg.showPet !== false);        // 桌宠：默认显示
 
     // 兜底轮询 + 休眠唤醒后补投
     setInterval(tick, 30000);

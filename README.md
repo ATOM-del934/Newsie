@@ -1,11 +1,11 @@
-# 🐋 全球一周速览 · 桌宠
+# 🌍 全球一周速览 · 桌宠
 
-> 一只常驻桌面的鲸鱼。每周日 20:00，它把「全球一周速览」推到你面前。
+> 一个常驻桌面的地球小报童。每周日 20:00，它把「全球一周速览」推到你面前。
 >
 > **零后端、零服务器、零账号** —— 内容是你自己的 HTML 文件，它只负责按时端上来。
 
 <p align="center">
-  <img src="docs/preview-pet.png" width="130" alt="桌面鲸鱼">&nbsp;&nbsp;&nbsp;
+  <img src="docs/preview-pet.png" width="130" alt="桌宠">&nbsp;&nbsp;&nbsp;
   <img src="docs/preview-popup.png" width="300" alt="投递气泡">
 </p>
 
@@ -14,7 +14,7 @@ every Sunday at 20:00. Two builds: a zero-install web page, and an Electron tray
 that keeps working after you close the window. No server, no account, no network calls.
 Jump to the [English summary](#english-summary).
 
-左边的鲸鱼常驻桌面，可拖动；右边的气泡就是每周日 20:00 弹出来的东西 ——
+左边的桌宠常驻桌面，可拖动，还会自己换姿势；右边的气泡就是每周日 20:00 弹出来的东西 ——
 一句话摘要、可直接打开的速览文件，以及**对上一期的复核结果**。
 
 ---
@@ -26,7 +26,8 @@ Jump to the [English summary](#english-summary).
 | 入口 | `index.html`（双击） | `electron-tray/启动.cmd`（Windows）<br>`pnpm start`（macOS / Linux） |
 | 安装 | **不用装任何东西** | 需要 Electron（约 230 MB） |
 | 关掉之后 | ❌ 不再推送，下次打开补投 | ✅ **照样准点推送** |
-| 桌面鲸鱼 | ✅ 可拖动 | ✅ 可拖动 |
+| 桌面桌宠 | ✅ 可拖动 | ✅ 可拖动 |
+| 待机动作 | ✅ 会自动换姿势 | ✅ 会自动换姿势 |
 | 系统通知 | 浏览器通知 | ✅ 原生通知 |
 | 未读红点 | 页面内 📬 | ✅ 叠在托盘图标上 |
 | 开机自启 | — | ✅ 菜单里勾选 |
@@ -42,7 +43,7 @@ Jump to the [English summary](#english-summary).
 
 双击 `index.html`。就这样。
 
-桌面右下角会出现一只可拖动的鲸鱼。点它身上的 **📬** 看最新一期，
+桌面右下角会出现一只可拖动的桌宠。点它身上的 **📬** 看最新一期，
 **📄** 用浏览器打开，**⋯** 打开设置。
 
 ### 托盘版
@@ -177,17 +178,19 @@ unset ELECTRON_RUN_AS_NODE
 ```
 .
 ├── index.html                 H5 桌宠（零依赖，双击可用）
-├── whale-official.png         头像：带底板原图
-├── whale-ink.png              头像：透明底
-├── whale-ink-96.png           头像：透明底 96px
+├── assets/                    形象素材（透明底 PNG）
+│   ├── pet.png                桌宠主体
+│   ├── tray-light.png         托盘图标：配浅色任务栏
+│   ├── tray-dark.png          托盘图标：配深色任务栏
+│   └── frames/                待机动画帧（18 张）
 ├── issues/
 │   ├── 全球一周速览-2026-10-04_10.html   示例期（报纸头版排版）
 │   └── _模板-新一期.md                    新一期模板 + 排版规格
 ├── electron-tray/             Electron 托盘版
 │   ├── 启动.cmd               Windows 入口
-│   ├── main.js                托盘 / 定时 / 气泡窗口 / 桌面鲸鱼
+│   ├── main.js                托盘 / 定时 / 气泡窗口 / 桌宠窗口
 │   ├── bubble.html            气泡界面
-│   ├── pet.html               桌面鲸鱼窗口
+│   ├── pet.html               桌宠窗口（待机动画在这里）
 │   ├── preload.js             安全桥
 │   ├── issues.js              读取期数清单 + 投递时刻推算
 │   ├── assets/                图标
@@ -197,23 +200,21 @@ unset ELECTRON_RUN_AS_NODE
 
 ---
 
-## 关于图标（待替换）
+## 关于角色
 
-⚠️ **本仓库当前的鲸鱼图标是作者自用版本的占位素材，公开发布前请先替换。**
-
-替换方法：把自己的图标覆盖到这些位置即可，尺寸与格式不拘，只要同名。
+桌宠形象是**「地球小报童」**：一个戴鸭舌帽、捧着《GLOBAL NEWS》的地球小人。
+所有素材都在 `assets/`，透明底 PNG，可以直接换成你自己的创作：
 
 ```
-whale-official.png                     ← 桌宠主头像（带底板）
-whale-ink.png / whale-ink-96.png       ← 透明底版本
-electron-tray/assets/whale-*.png       ← 托盘版用
-electron-tray/assets/tray-*.png        ← 托盘小图标（深/浅任务栏各一）
+assets/pet.png / pet-96.png     桌宠主体（默认姿势）
+assets/frames/*.png             待机动画帧（18 张）
+assets/tray-light.png           托盘图标：配浅色任务栏
+assets/tray-dark.png            托盘图标：配深色任务栏
 ```
 
-替换后记得重新生成 README 里的预览图（见 `docs/`）。
+替换后建议重新生成 README 里的预览图（`docs/`）。
 
-本项目是**个人作品，与 DeepSeek 无任何关系**，未获其授权、背书或赞助；
-请勿在发布时使用他人的品牌标识。
+本项目是**个人作品，与任何新闻机构或平台无关联**。
 
 ---
 
@@ -256,8 +257,12 @@ on Linux).
 **Status** — fully tested on Windows 11 only; the macOS/Linux code paths exist but have
 not run on real hardware.
 
-MIT licensed. Not affiliated with, endorsed by, or sponsored by DeepSeek.
+MIT licensed. The desk-pet character is an original "globe newsboy" design; all artwork
+lives under `assets/` and can be swapped for your own.
 
-> **Note on artwork:** the whale icons currently in this repository are placeholders from
-> the author's personal build and **must be replaced with your own artwork before you
-> publish a fork**. See the icon section above for the file paths.
+**Idle animation** — frames in `assets/frames/` are cycled every 6-12 seconds so the pet
+changes pose and expression while it waits. Every pose is full-body and carries its own
+expression (reading, sipping coffee, napping, cheering); swapping in a head-only frame
+would make the body pop in and out, so the head-only expressions are reserved for the
+tray icon. Turning the animation off is a menu item in the tray build and a toggle in
+the web build's settings.
