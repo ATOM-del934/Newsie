@@ -19,6 +19,12 @@
     0%,100%{transform:translateY(0) rotate(0deg)}
     50%    {transform:translateY(-3px) rotate(-1deg)}
   }
+  /* 和网页版保持一致：系统设置里要求减少动态效果时，停掉起伏动画。
+     换姿势仍会进行（那是内容，不是装饰性动效）。 */
+  @media (prefers-reduced-motion:reduce){
+    #stage.bob{animation:none}
+    #stage img{transition:none}
+  }
   #stage img{position:absolute;left:0;top:0;width:104px;height:104px;
     display:block;object-fit:contain;transition:opacity .26s ease}
   #a{opacity:1} #b{opacity:0}

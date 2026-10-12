@@ -495,6 +495,9 @@ function tick() {
     due.forEach(it => { if (st.delivered.indexOf(it.id) < 0) st.delivered.push(it.id); });
     saveSt();
     showIssue(latest);
+    /* 桌宠也要知道"投递了"，否则它那套「播报 → 欢呼」的待机反应永远不会播。
+       之前只给气泡发 issue，桌宠那段是死代码。 */
+    pushToPet('issue', { id: latest.id, range: latest.range });
     notify(`新的一期：${latest.range}`, '全球一周速览');
     if (due.length > 1) notify(`另有 ${due.length - 1} 期也已到投递时间，右键托盘查看`);
     scheduleNext();
@@ -710,6 +713,15 @@ if (!app.requestSingleInstanceLock()) {
     refreshTray();
     scheduleNext();
     showPet(cfg.showPet !== false);        // 桌宠：默认显示
+
+    /* 启动就补投一次。
+       原先只靠 setInterval(tick, 30000)，而 scheduleNext() 的定时器指向的是
+       "下一次投递时刻" —— 若今天已过投递时间，那是下周。于是启动时已到点的
+       期数最长要等 30 秒才补上，和网页版（boot() 里立刻 tick()）不一致，
+       也和说明里写的"立刻补上"不符。
+       延迟 600ms 是为了让桌宠窗口先加载完，否则它收不到 issue、不会播放欢呼。
+       --preview 模式跳过：它只负责展示气泡、刻意不产生任何投递副作用。 */
+    if (!process.argv.includes('--preview')) setTimeout(tick, 600);
 
     // 兜底轮询 + 休眠唤醒后补投
     setInterval(tick, 30000);
