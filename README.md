@@ -96,6 +96,21 @@ pnpm install
 pnpm run pack        # 产出 dist/Newsie-win32-x64/，含 Newsie.exe
 ```
 
+### 如果 `pnpm start` 报「找不到 electron.exe」
+
+`pnpm install` 显示成功，却启动失败？这是 pnpm 10 以上的一个坑：
+
+> pnpm 出于安全考虑**默认不执行依赖的构建脚本**，而 Electron 的运行时
+> （`electron.exe`）正是靠 `electron` 包自己的 postinstall 下载的。
+> 脚本被拦掉 → 只装了空壳 → 启动时找不到可执行文件。
+
+本项目已经用 `scripts/ensure-electron.js` 在安装后自动补这一步，正常不会遇到。
+仍然遇到就手动补跑一次：
+
+```bash
+node node_modules/electron/install.js
+```
+
 ### 如果 Electron 下载卡住
 
 GitHub Releases 在国内经常连不上。`electron-tray/.npmrc` 已经配好国内镜像：

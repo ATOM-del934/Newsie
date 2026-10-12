@@ -5,6 +5,7 @@
   "description": "Newsie · Electron 托盘版桌宠：常驻托盘，每周日 20:00 准点投递",
   "main": "main.js",
   "scripts": {
+    "postinstall": "node scripts/ensure-electron.js",
     "start": "electron .",
     "selftest": "electron . --selftest",
     "preview": "electron . --preview",
